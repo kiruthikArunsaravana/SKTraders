@@ -318,7 +318,7 @@ export default function FinancePage() {
                   </div>
                   <div>
                     <Label>Report Description</Label>
-                    <Textarea name="reportDescription" defaultValue="Generate a summary of income and expenses for the first date range."/>
+                    <Textarea name="reportDescription" defaultValue="Compare sales and profits for the two date ranges, highlighting the best performing product in each period."/>
                   </div>
                    <ReportResults state={reportState} />
                 </div>
@@ -472,5 +472,3 @@ export default function FinancePage() {
     </div>
   );
 }
-
-
