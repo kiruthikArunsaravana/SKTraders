@@ -38,8 +38,8 @@ export async function handleGenerateFinanceReport(
         reportDescription: validatedFields.reportDescription,
         fromDate1: format(new Date(validatedFields.dateRange1From), 'yyyy-MM-dd'),
         toDate1: format(new Date(validatedFields.dateRange1To), 'yyyy-MM-dd'),
-        fromDate2: validatedFields.dateRange2From ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
-        toDate2: validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
+        fromDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
+        toDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
     };
     
     const result = await generateReport(input);
