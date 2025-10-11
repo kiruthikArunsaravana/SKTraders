@@ -11,7 +11,17 @@ const reportSchema = z.object({
   dateRange1To: z.string().min(1),
   dateRange2From: z.string().optional(),
   dateRange2To: z.string().optional(),
+}).refine(data => {
+    // If one of dateRange2 is present, the other must be too.
+    if (data.dateRange2From || data.dateRange2To) {
+        return !!data.dateRange2From && !!data.dateRange2To;
+    }
+    return true;
+}, {
+    message: "Both 'from' and 'to' dates are required for the second date range if one is provided.",
+    path: ["dateRange2"],
 });
+
 
 type ReportState = {
   report: string | null;
