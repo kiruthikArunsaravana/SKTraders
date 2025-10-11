@@ -73,8 +73,20 @@ export async function handleGenerateFinanceReport(
         reportDescription: validatedFields.reportDescription,
         fromDate1: format(fromDate1, 'yyyy-MM-dd'),
         toDate1: format(toDate1, 'yyyy-MM-dd'),
+        transactions1: transactionsInRange1.map(t => ({
+          ...t,
+          type: t.type.toLowerCase() as 'income' | 'expense',
+          description: t.clientName,
+          category: t.product,
+        })),
         fromDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
         toDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
+        transactions2: transactionsInRange2.map(t => ({
+          ...t,
+          type: t.type.toLowerCase() as 'income' | 'expense',
+          description: t.clientName,
+          category: t.product,
+        }))
     };
     
     const result = await generateReport(input);
