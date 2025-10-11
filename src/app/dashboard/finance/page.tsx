@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { PlusCircle, Calendar as CalendarIcon, Filter, Wand2, Loader2 } from 'lucide-react';
@@ -146,6 +147,7 @@ export default function FinancePage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [reportDateRange2, setReportDateRange2] = useState<DateRange | undefined>();
 
   const [reportState, formAction] = useFormState(handleGenerateFinanceReport, initialState);
 
@@ -240,6 +242,8 @@ export default function FinancePage() {
                 <div className="py-4 space-y-4">
                   <input type="hidden" name="dateRange1.from" value={plDateRange?.from?.toISOString() ?? ''} />
                   <input type="hidden" name="dateRange1.to" value={plDateRange?.to?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRange2.from" value={reportDateRange2?.from?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRange2.to" value={reportDateRange2?.to?.toISOString() ?? ''} />
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col space-y-2">
                       <Label>Date Range 1</Label>
@@ -287,12 +291,25 @@ export default function FinancePage() {
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              <span>Pick a date range</span>
+                               {reportDateRange2?.from ? (
+                                reportDateRange2.to ? (
+                                  <>
+                                    {format(reportDateRange2.from, 'LLL dd, y')} -{' '}
+                                    {format(reportDateRange2.to, 'LLL dd, y')}
+                                  </>
+                                ) : (
+                                  format(reportDateRange2.from, 'LLL dd, y')
+                                )
+                              ) : (
+                                <span>Pick a date range</span>
+                              )}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="range"
+                              selected={reportDateRange2}
+                              onSelect={setReportDateRange2}
                               numberOfMonths={2}
                             />
                           </PopoverContent>
@@ -455,4 +472,5 @@ export default function FinancePage() {
     </div>
   );
 }
+
 
