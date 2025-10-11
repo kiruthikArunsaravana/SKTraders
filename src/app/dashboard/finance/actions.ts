@@ -53,9 +53,14 @@ export async function handleGenerateFinanceReport(
     });
 
     let transactionsInRange2: any[] = [];
+    let fromDate2Str = 'N/A';
+    let toDate2Str = 'N/A';
+    
     if (validatedFields.dateRange2From && validatedFields.dateRange2To) {
         const fromDate2 = new Date(validatedFields.dateRange2From);
         const toDate2 = new Date(validatedFields.dateRange2To);
+        fromDate2Str = format(fromDate2, 'yyyy-MM-dd');
+        toDate2Str = format(toDate2, 'yyyy-MM-dd');
         transactionsInRange2 = transactions.filter(t => {
             const transactionDate = new Date(t.date);
             return transactionDate >= fromDate2 && transactionDate <= toDate2;
@@ -81,8 +86,8 @@ export async function handleGenerateFinanceReport(
           date: t.date,
           category: t.product,
         })),
-        fromDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
-        toDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
+        fromDate2: fromDate2Str,
+        toDate2: toDate2Str,
         transactions2: transactionsInRange2.map(t => ({
           id: t.id,
           type: t.type.toLowerCase() as 'income' | 'expense',
