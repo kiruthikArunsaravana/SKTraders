@@ -58,7 +58,7 @@ Date Range 1: From {{fromDate1}} to {{toDate1}}
 Transactions for Date Range 1:
 {{#if transactions1}}
 {{#each transactions1}}
-- {{date}}: {{description}} ({{category}}) - Amount: {{amount}} ({{type}})
+- {{this.date}}: {{this.description}} ({{this.category}}) - Amount: {{this.amount}} ({{this.type}})
 {{/each}}
 {{else}}
 No transactions in this period.
@@ -68,7 +68,7 @@ Date Range 2: From {{fromDate2}} to {{toDate2}}
 Transactions for Date Range 2:
 {{#if transactions2}}
 {{#each transactions2}}
-- {{date}}: {{description}} ({{category}}) - Amount: {{amount}} ({{type}})
+- {{this.date}}: {{this.description}} ({{this.category}}) - Amount: {{this.amount}} ({{this.type}})
 {{/each}}
 {{else}}
 No transactions in this period.
