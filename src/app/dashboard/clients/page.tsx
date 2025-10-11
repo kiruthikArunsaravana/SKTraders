@@ -5,16 +5,35 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { clients } from '@/lib/data';
+import { clients as initialClients } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function ClientsPage() {
   const { toast } = useToast();
+  const [clients, setClients] = useState(initialClients);
+  const [isDialogOpen, setDialogOpen] = useState(false);
 
-  function handleAddClient() {
+  function handleAddClient(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const newClient = {
+      id: (clients.length + 1).toString(),
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      company: formData.get('company') as string,
+      country: formData.get('country') as string,
+      totalSales: 0,
+      lastPurchaseDate: new Date().toISOString().split('T')[0],
+    };
+    setClients([...clients, newClient]);
+    setDialogOpen(false);
     toast({
-      title: "Feature coming soon",
-      description: "The ability to add a new client is not yet implemented.",
+      title: "Client Added",
+      description: `${newClient.name} has been successfully added.`,
     });
   }
 
@@ -22,9 +41,44 @@ export default function ClientsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline">Client Management</h1>
-        <Button onClick={handleAddClient}>
-          <PlusCircle className="mr-2 h-5 w-5" /> Add Client
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-5 w-5" /> Add Client
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+              <DialogDescription>
+                Enter the details of the new client.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddClient}>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" placeholder="John Doe" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" name="email" type="email" placeholder="john@example.com" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company</Label>
+                  <Input id="company" name="company" placeholder="Acme Inc." required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input id="country" name="country" placeholder="USA" required />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit">Add Client</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
       <Card>
         <CardHeader>
