@@ -1,16 +1,24 @@
 'use client';
 
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Calendar as CalendarIcon, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { transactions as initialTransactions } from '@/lib/data';
+import type { Transaction } from '@/lib/types';
+import { format, isToday, isThisMonth, isThisYear, startOfMonth, endOfMonth, startOfYear, endOfYear, sub } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
 
 const expenseCategories = [
   { id: 'husk', name: 'Husk' },
@@ -26,39 +34,172 @@ const incomeProducts = [
   { id: 'other', name: 'Other' },
 ];
 
+type FinancialTransaction = {
+  id: string;
+  type: 'income' | 'expense';
+  amount: number;
+  description: string;
+  date: string;
+  category: string;
+};
+
 export default function FinancePage() {
   const { toast } = useToast();
-  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>(
+    // Augmenting initial data to fit the new structure
+    initialTransactions.map(t => ({
+      id: t.id,
+      type: t.type.toLowerCase() as 'income' | 'expense',
+      amount: t.amount,
+      description: t.clientName,
+      date: t.date,
+      category: t.product,
+    }))
+  );
+  const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
+  const [isExportDialogOpen, setExportDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState('income');
+  const [plFilter, setPlFilter] = useState('monthly');
+  const [plDateRange, setPlDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
 
-  function handleFeatureClick(featureName: string) {
-    toast({
-      title: "Feature coming soon",
-      description: `The "${featureName}" feature is not yet implemented.`,
-    });
-  }
-
-  function handleAddEntry(event: React.FormEvent<HTMLFormElement>) {
+  const handleAddEntry = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const type = formData.get('type');
-    const amount = formData.get('amount');
-    const description = formData.get('description');
+    const type = formData.get('type') as 'income' | 'expense';
+    const amount = parseFloat(formData.get('amount') as string);
+    const description = formData.get('description') as string;
+    const category = (formData.get('category') || formData.get('product')) as string;
     
-    setDialogOpen(false);
+    const newTransaction: FinancialTransaction = {
+      id: (transactions.length + 1).toString(),
+      type,
+      amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+      description,
+      category,
+      date: new Date().toISOString(),
+    };
+
+    setTransactions([...transactions, newTransaction]);
+    setAddEntryDialogOpen(false);
     toast({
       title: "Entry Added",
-      description: `A new ${type} entry for $${amount} has been recorded.`,
+      description: `A new ${type} entry for $${Math.abs(amount)} has been recorded.`,
+    });
+  };
+
+  const handleExport = () => {
+    setExportDialogOpen(false);
+    toast({
+      title: "Feature coming soon",
+      description: "PDF export functionality is not yet implemented.",
     });
   }
+
+  const filteredTransactions = useMemo(() => {
+    let startDate: Date;
+    let endDate: Date;
+
+    switch (plFilter) {
+      case 'monthly':
+        startDate = startOfMonth(new Date());
+        endDate = endOfMonth(new Date());
+        break;
+      case 'yearly':
+        startDate = startOfYear(new Date());
+        endDate = endOfYear(new Date());
+        break;
+      case 'custom':
+        if (!plDateRange?.from || !plDateRange?.to) {
+          return [];
+        }
+        startDate = plDateRange.from;
+        endDate = plDateRange.to;
+        break;
+      default:
+        return [];
+    }
+
+    return transactions.filter(t => {
+      const transactionDate = new Date(t.date);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    });
+  }, [transactions, plFilter, plDateRange]);
+
+  const { totalIncome, totalExpenses, netProfit } = useMemo(() => {
+    const totalIncome = filteredTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = filteredTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    return {
+      totalIncome,
+      totalExpenses: Math.abs(totalExpenses),
+      netProfit: totalIncome + totalExpenses,
+    };
+  }, [filteredTransactions]);
+
+  const todaysIncome = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'income');
+  const todaysExpenses = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'expense');
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => handleFeatureClick('Export PDF')}>Export PDF</Button>
-          <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={isExportDialogOpen} onOpenChange={setExportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">Export PDF</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Export Report</DialogTitle>
+                <DialogDescription>Select a date range for the PDF report.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={'outline'}
+                        className={cn(
+                          'w-full justify-start text-left font-normal'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {plDateRange?.from ? (
+                          plDateRange.to ? (
+                            <>
+                              {format(plDateRange.from, 'LLL dd, y')} -{' '}
+                              {format(plDateRange.to, 'LLL dd, y')}
+                            </>
+                          ) : (
+                            format(plDateRange.from, 'LLL dd, y')
+                          )
+                        ) : (
+                          <span>Pick a date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={plDateRange}
+                        onSelect={setPlDateRange}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleExport}>Export</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isAddEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
@@ -67,77 +208,30 @@ export default function FinancePage() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Financial Entry</DialogTitle>
-                <DialogDescription>
-                  Record a new income or expense transaction.
-                </DialogDescription>
+                <DialogDescription>Record a new income or expense transaction.</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddEntry}>
                 <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <RadioGroup 
-                      defaultValue="income" 
-                      name="type" 
-                      className="flex gap-4"
-                      onValueChange={(value) => setEntryType(value)}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="income" id="income" />
-                        <Label htmlFor="income">Income</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="expense" id="expense" />
-                        <Label htmlFor="expense">Expense</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount</Label>
-                    <Input id="amount" name="amount" type="number" placeholder="0.00" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Input id="description" name="description" placeholder="e.g., Sale of Coco Pith" required />
-                  </div>
+                  <RadioGroup defaultValue="income" name="type" className="flex gap-4" onValueChange={setEntryType}>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="income" id="income" /><Label htmlFor="income">Income</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="expense" id="expense" /><Label htmlFor="expense">Expense</Label></div>
+                  </RadioGroup>
+                  <Input id="amount" name="amount" type="number" placeholder="Amount" required />
+                  <Input id="description" name="description" placeholder="Description" required />
                   {entryType === 'expense' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Select name="category">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {expenseCategories.map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select name="category" required><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger><SelectContent>{expenseCategories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}</SelectContent></Select>
                   )}
                   {entryType === 'income' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="product">Product</Label>
-                      <Select name="product">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {incomeProducts.map(p => (
-                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                     <Select name="product" required><SelectTrigger><SelectValue placeholder="Select a product" /></SelectTrigger><SelectContent>{incomeProducts.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent></Select>
                   )}
                 </div>
-                <DialogFooter>
-                  <Button type="submit">Add Entry</Button>
-                </DialogFooter>
+                <DialogFooter><Button type="submit">Add Entry</Button></DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -146,15 +240,103 @@ export default function FinancePage() {
           <TabsTrigger value="profit-loss">Profit/Loss</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Financial Overview</CardTitle>
-                    <CardDescription>A summary of your income, expenses, and profit.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p>Financial overview content goes here.</p>
-                </CardContent>
-            </Card>
+          <Card>
+            <CardHeader><CardTitle>Financial Overview</CardTitle><CardDescription>A summary of your finances for this month.</CardDescription></CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-lg">Total Income</CardTitle></CardHeader>
+                    <CardContent><p className="text-3xl font-bold text-green-600">${(transactions.filter(t => isThisMonth(new Date(t.date)) && t.type === 'income').reduce((acc, t) => acc + t.amount, 0)).toLocaleString()}</p></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-lg">Total Expenses</CardTitle></CardHeader>
+                    <CardContent><p className="text-3xl font-bold text-red-600">-${(Math.abs(transactions.filter(t => isThisMonth(new Date(t.date)) && t.type === 'expense').reduce((acc, t) => acc + t.amount, 0))).toLocaleString()}</p></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-lg">Net Profit</CardTitle></CardHeader>
+                    <CardContent><p className="text-3xl font-bold">${(transactions.filter(t => isThisMonth(new Date(t.date))).reduce((acc, t) => acc + t.amount, 0)).toLocaleString()}</p></CardContent>
+                </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="income">
+          <Card>
+            <CardHeader><CardTitle>Today's Income</CardTitle><CardDescription>Income transactions recorded today.</CardDescription></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Description</TableHead><TableHead>Product</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {todaysIncome.length > 0 ? todaysIncome.map(t => (
+                    <TableRow key={t.id}><TableCell>{t.description}</TableCell><TableCell>{t.category}</TableCell><TableCell className="text-right">${t.amount.toLocaleString()}</TableCell></TableRow>
+                  )) : <TableRow><TableCell colSpan={3} className="text-center">No income recorded today.</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="expenses">
+          <Card>
+            <CardHeader><CardTitle>Today's Expenses</CardTitle><CardDescription>Expense transactions recorded today.</CardDescription></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Description</TableHead><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {todaysExpenses.length > 0 ? todaysExpenses.map(t => (
+                    <TableRow key={t.id}><TableCell>{t.description}</TableCell><TableCell>{t.category}</TableCell><TableCell className="text-right">-${Math.abs(t.amount).toLocaleString()}</TableCell></TableRow>
+                  )) : <TableRow><TableCell colSpan={3} className="text-center">No expenses recorded today.</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="profit-loss">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profit & Loss Statement</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardDescription>Analyze your profit and loss over different periods.</CardDescription>
+                <div className="flex items-center gap-2">
+                  <Button variant={plFilter === 'monthly' ? 'default' : 'outline'} size="sm" onClick={() => { setPlFilter('monthly'); setPlDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }); }}>Monthly</Button>
+                  <Button variant={plFilter === 'yearly' ? 'default' : 'outline'} size="sm" onClick={() => { setPlFilter('yearly'); setPlDateRange({ from: startOfYear(new Date()), to: endOfYear(new Date()) }); }}>Yearly</Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant={plFilter === 'custom' ? 'default' : 'outline'} size="sm"><Filter className="mr-2 h-4 w-4" /> Custom</Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={plDateRange?.from}
+                        selected={plDateRange}
+                        onSelect={(range) => { setPlDateRange(range); setPlFilter('custom'); }}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-green-50 dark:bg-green-900/20"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Total Income</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-green-600 dark:text-green-500">${totalIncome.toLocaleString()}</p></CardContent></Card>
+                <Card className="bg-red-50 dark:bg-red-900/20"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">Total Expenses</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-600 dark:text-red-500">-${totalExpenses.toLocaleString()}</p></CardContent></Card>
+                <Card className={netProfit >= 0 ? "bg-blue-50 dark:bg-blue-900/20" : "bg-red-50 dark:bg-red-900/20"}><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">Net Profit</CardTitle></CardHeader><CardContent><p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>${netProfit.toLocaleString()}</p></CardContent></Card>
+              </div>
+              <Table>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Description</TableHead><TableHead>Category/Product</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {filteredTransactions.length > 0 ? filteredTransactions.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell>{format(new Date(t.date), 'PP')}</TableCell>
+                      <TableCell>{t.description}</TableCell>
+                      <TableCell>{t.category}</TableCell>
+                      <TableCell>{t.type === 'income' ? 'Income' : 'Expense'}</TableCell>
+                      <TableCell className={`text-right font-medium ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'income' ? '+' : '-'}${Math.abs(t.amount).toLocaleString()}</TableCell>
+                    </TableRow>
+                  )) : <TableRow><TableCell colSpan={5} className="text-center">No transactions in this period.</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
