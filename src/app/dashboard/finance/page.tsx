@@ -142,6 +142,7 @@ export default function FinancePage() {
   const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
   const [isExportDialogOpen, setExportDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState('income');
+  const [entryDate, setEntryDate] = useState<Date | undefined>(new Date());
   const [plFilter, setPlFilter] = useState('monthly');
   const [plDateRange, setPlDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -166,11 +167,12 @@ export default function FinancePage() {
       amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
       description,
       category,
-      date: new Date().toISOString(),
+      date: entryDate?.toISOString() ?? new Date().toISOString(),
     };
 
     setTransactions([...transactions, newTransaction]);
     setAddEntryDialogOpen(false);
+    setEntryDate(new Date()); // Reset date for next entry
     toast({
       title: "Entry Added",
       description: `A new ${type} entry for $${Math.abs(amount)} has been recorded.`,
@@ -354,6 +356,27 @@ export default function FinancePage() {
                   {entryType === 'income' && (
                      <Select name="product" required><SelectTrigger><SelectValue placeholder="Select a product" /></SelectTrigger><SelectContent>{incomeProducts.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}</SelectContent></Select>
                   )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={'outline'}
+                        className={cn(
+                          'w-full justify-start text-left font-normal'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={entryDate}
+                        onSelect={setEntryDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <DialogFooter><Button type="submit">Add Entry</Button></DialogFooter>
               </form>
