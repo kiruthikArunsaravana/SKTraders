@@ -19,6 +19,13 @@ const expenseCategories = [
   { id: 'other', name: 'Other' },
 ];
 
+const incomeProducts = [
+  { id: 'coco-pith', name: 'Coco Pith' },
+  { id: 'coir-fiber', name: 'Coir Fiber' },
+  { id: 'husk-chips', name: 'Husk Chips' },
+  { id: 'other', name: 'Other' },
+];
+
 export default function FinancePage() {
   const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
@@ -102,6 +109,21 @@ export default function FinancePage() {
                         <SelectContent>
                           {expenseCategories.map(c => (
                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {entryType === 'income' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="product">Product</Label>
+                      <Select name="product">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {incomeProducts.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
