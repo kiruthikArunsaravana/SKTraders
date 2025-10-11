@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -34,6 +35,7 @@ import Image from 'next/image';
 import { placeholderImages } from '@/lib/placeholder-images.json';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
+import React from 'react';
 
 export default function AppHeader() {
   const pathname = usePathname();
@@ -137,6 +139,3 @@ export default function AppHeader() {
     </header>
   );
 }
-
-// Dummy useTheme for server components to not break
-const useTheme = () => ({ setTheme: (theme: string) => {} });
