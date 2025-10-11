@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { generateReport } from '@/ai/flows/generate-report';
 import { format } from 'date-fns';
+import { transactions } from '@/lib/data';
 
 const reportSchema = z.object({
   reportDescription: z.string().min(1),
@@ -12,7 +13,6 @@ const reportSchema = z.object({
   dateRange2From: z.string().optional(),
   dateRange2To: z.string().optional(),
 }).refine(data => {
-    // If one of dateRange2 is present, the other must be too.
     if (data.dateRange2From || data.dateRange2To) {
         return !!data.dateRange2From && !!data.dateRange2To;
     }
@@ -44,10 +44,35 @@ export async function handleGenerateFinanceReport(
   try {
     const validatedFields = reportSchema.parse(rawFormData);
     
+    const fromDate1 = new Date(validatedFields.dateRange1From);
+    const toDate1 = new Date(validatedFields.dateRange1To);
+    
+    const transactionsInRange1 = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= fromDate1 && transactionDate <= toDate1;
+    });
+
+    let transactionsInRange2: any[] = [];
+    if (validatedFields.dateRange2From && validatedFields.dateRange2To) {
+        const fromDate2 = new Date(validatedFields.dateRange2From);
+        const toDate2 = new Date(validatedFields.dateRange2To);
+        transactionsInRange2 = transactions.filter(t => {
+            const transactionDate = new Date(t.date);
+            return transactionDate >= fromDate2 && transactionDate <= toDate2;
+        });
+    }
+
+    if (transactionsInRange1.length === 0 && transactionsInRange2.length === 0) {
+        return {
+            report: null,
+            error: "No transaction data found for the selected date range(s). Please select a different range.",
+        };
+    }
+
     const input = {
         reportDescription: validatedFields.reportDescription,
-        fromDate1: format(new Date(validatedFields.dateRange1From), 'yyyy-MM-dd'),
-        toDate1: format(new Date(validatedFields.dateRange1To), 'yyyy-MM-dd'),
+        fromDate1: format(fromDate1, 'yyyy-MM-dd'),
+        toDate1: format(toDate1, 'yyyy-MM-dd'),
         fromDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
         toDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
     };
