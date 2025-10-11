@@ -74,17 +74,21 @@ export async function handleGenerateFinanceReport(
         fromDate1: format(fromDate1, 'yyyy-MM-dd'),
         toDate1: format(toDate1, 'yyyy-MM-dd'),
         transactions1: transactionsInRange1.map(t => ({
-          ...t,
+          id: t.id,
           type: t.type.toLowerCase() as 'income' | 'expense',
+          amount: t.amount,
           description: t.clientName,
+          date: t.date,
           category: t.product,
         })),
         fromDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd') : 'N/A',
         toDate2: validatedFields.dateRange2From && validatedFields.dateRange2To ? format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd') : 'N/A',
         transactions2: transactionsInRange2.map(t => ({
-          ...t,
+          id: t.id,
           type: t.type.toLowerCase() as 'income' | 'expense',
+          amount: t.amount,
           description: t.clientName,
+          date: t.date,
           category: t.product,
         }))
     };
