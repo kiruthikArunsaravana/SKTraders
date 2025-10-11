@@ -11,11 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { products } from '@/lib/data';
+
+const expenseCategories = [
+  { id: 'husk', name: 'Husk' },
+  { id: 'maintenance', name: 'Maintenance' },
+  { id: 'labour', name: 'Labour' },
+  { id: 'other', name: 'Other' },
+];
 
 export default function FinancePage() {
   const { toast } = useToast();
   const [isDialogOpen, setDialogOpen] = useState(false);
+  const [entryType, setEntryType] = useState('income');
 
   function handleFeatureClick(featureName: string) {
     toast({
@@ -27,17 +34,14 @@ export default function FinancePage() {
   function handleAddEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const entryType = formData.get('type');
+    const type = formData.get('type');
     const amount = formData.get('amount');
     const description = formData.get('description');
-    
-    // Here you would typically handle the form submission, 
-    // e.g., send data to a server or update state.
     
     setDialogOpen(false);
     toast({
       title: "Entry Added",
-      description: `A new ${entryType} entry for $${amount} has been recorded.`,
+      description: `A new ${type} entry for $${amount} has been recorded.`,
     });
   }
 
@@ -64,7 +68,12 @@ export default function FinancePage() {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <RadioGroup defaultValue="income" name="type" className="flex gap-4">
+                    <RadioGroup 
+                      defaultValue="income" 
+                      name="type" 
+                      className="flex gap-4"
+                      onValueChange={(value) => setEntryType(value)}
+                    >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="income" id="income" />
                         <Label htmlFor="income">Income</Label>
@@ -83,19 +92,21 @@ export default function FinancePage() {
                     <Label htmlFor="description">Description</Label>
                     <Input id="description" name="description" placeholder="e.g., Sale of Coco Pith" required />
                   </div>
-                   <div className="space-y-2">
-                    <Label htmlFor="product">Related Product (Optional)</Label>
-                     <Select name="product">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {entryType === 'expense' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select name="category">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {expenseCategories.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button type="submit">Add Entry</Button>
