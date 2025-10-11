@@ -8,8 +8,8 @@ import { transactions } from '@/lib/data';
 
 const reportSchema = z.object({
   reportDescription: z.string().min(1),
-  dateRange1From: z.string().min(1),
-  dateRange1To: z.string().min(1),
+  dateRangeFrom: z.string().min(1),
+  dateRangeTo: z.string().min(1),
 });
 
 
@@ -25,22 +25,22 @@ export async function handleGenerateFinanceReport(
   
   const rawFormData = {
     reportDescription: formData.get('reportDescription'),
-    dateRange1From: formData.get('dateRange1.from'),
-    dateRange1To: formData.get('dateRange1.to'),
+    dateRangeFrom: formData.get('dateRange.from'),
+    dateRangeTo: formData.get('dateRange.to'),
   };
 
   try {
     const validatedFields = reportSchema.parse(rawFormData);
     
-    const fromDate1 = new Date(validatedFields.dateRange1From);
-    const toDate1 = new Date(validatedFields.dateRange1To);
+    const fromDate = new Date(validatedFields.dateRangeFrom);
+    const toDate = new Date(validatedFields.dateRangeTo);
     
-    const transactionsInRange1 = transactions.filter(t => {
+    const transactionsInRange = transactions.filter(t => {
         const transactionDate = new Date(t.date);
-        return transactionDate >= fromDate1 && transactionDate <= toDate1;
+        return transactionDate >= fromDate && transactionDate <= toDate;
     });
 
-    if (transactionsInRange1.length === 0) {
+    if (transactionsInRange.length === 0) {
         return {
             report: null,
             error: "No transaction data found for the selected date range. Please select a different range.",
@@ -49,9 +49,9 @@ export async function handleGenerateFinanceReport(
 
     const input = {
         reportDescription: validatedFields.reportDescription,
-        fromDate: format(fromDate1, 'yyyy-MM-dd'),
-        toDate: format(toDate1, 'yyyy-MM-dd'),
-        transactions: transactionsInRange1.map(t => ({
+        fromDate: format(fromDate, 'yyyy-MM-dd'),
+        toDate: format(toDate, 'yyyy-MM-dd'),
+        transactions: transactionsInRange.map(t => ({
           id: t.id,
           type: t.type.toLowerCase() as 'income' | 'expense',
           amount: t.amount,

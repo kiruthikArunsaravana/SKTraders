@@ -148,6 +148,11 @@ export default function FinancePage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  
+  const [reportDateRange, setReportDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
 
   const [reportState, formAction] = useFormState(handleGenerateFinanceReport, initialState);
 
@@ -232,7 +237,7 @@ export default function FinancePage() {
         <div className="flex gap-2">
           <Dialog open={isExportDialogOpen} onOpenChange={setExportDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">Export Report</Button>
+              <Button variant="outline">Generate Report</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <form action={formAction}>
@@ -241,8 +246,8 @@ export default function FinancePage() {
                   <DialogDescription>Describe the financial report you want to generate using AI.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
-                  <input type="hidden" name="dateRange1.from" value={plDateRange?.from?.toISOString() ?? ''} />
-                  <input type="hidden" name="dateRange1.to" value={plDateRange?.to?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRange.from" value={reportDateRange?.from?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRange.to" value={reportDateRange?.to?.toISOString() ?? ''} />
                   
                   <div className="flex flex-col space-y-2">
                     <Label>Date Range</Label>
@@ -255,14 +260,14 @@ export default function FinancePage() {
                             )}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {plDateRange?.from ? (
-                              plDateRange.to ? (
+                            {reportDateRange?.from ? (
+                              reportDateRange.to ? (
                                 <>
-                                  {format(plDateRange.from, 'LLL dd, y')} -{' '}
-                                  {format(plDateRange.to, 'LLL dd, y')}
+                                  {format(reportDateRange.from, 'LLL dd, y')} -{' '}
+                                  {format(reportDateRange.to, 'LLL dd, y')}
                                 </>
                               ) : (
-                                format(plDateRange.from, 'LLL dd, y')
+                                format(reportDateRange.from, 'LLL dd, y')
                               )
                             ) : (
                               <span>Pick a date range</span>
@@ -272,8 +277,8 @@ export default function FinancePage() {
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="range"
-                            selected={plDateRange}
-                            onSelect={setPlDateRange}
+                            selected={reportDateRange}
+                            onSelect={setReportDateRange}
                             numberOfMonths={2}
                           />
                         </PopoverContent>
