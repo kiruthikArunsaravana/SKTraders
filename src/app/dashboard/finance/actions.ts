@@ -10,16 +10,6 @@ const reportSchema = z.object({
   reportDescription: z.string().min(1),
   dateRange1From: z.string().min(1),
   dateRange1To: z.string().min(1),
-  dateRange2From: z.string().optional(),
-  dateRange2To: z.string().optional(),
-}).refine(data => {
-    if (data.dateRange2From || data.dateRange2To) {
-        return !!data.dateRange2From && !!data.dateRange2To;
-    }
-    return true;
-}, {
-    message: "Both 'from' and 'to' dates are required for the second date range if one is provided.",
-    path: ["dateRange2"],
 });
 
 
@@ -37,8 +27,6 @@ export async function handleGenerateFinanceReport(
     reportDescription: formData.get('reportDescription'),
     dateRange1From: formData.get('dateRange1.from'),
     dateRange1To: formData.get('dateRange1.to'),
-    dateRange2From: formData.get('dateRange2.from') || undefined,
-    dateRange2To: formData.get('dateRange2.to') || undefined,
   };
 
   try {
@@ -52,33 +40,18 @@ export async function handleGenerateFinanceReport(
         return transactionDate >= fromDate1 && transactionDate <= toDate1;
     });
 
-    let transactionsInRange2: any[] = [];
-    let fromDate2Str = 'N/A';
-    let toDate2Str = 'N/A';
-    
-    if (validatedFields.dateRange2From && validatedFields.dateRange2To) {
-        const fromDate2 = new Date(validatedFields.dateRange2From);
-        const toDate2 = new Date(validatedFields.dateRange2To);
-        fromDate2Str = format(fromDate2, 'yyyy-MM-dd');
-        toDate2Str = format(toDate2, 'yyyy-MM-dd');
-        transactionsInRange2 = transactions.filter(t => {
-            const transactionDate = new Date(t.date);
-            return transactionDate >= fromDate2 && transactionDate <= toDate2;
-        });
-    }
-
-    if (transactionsInRange1.length === 0 && transactionsInRange2.length === 0) {
+    if (transactionsInRange1.length === 0) {
         return {
             report: null,
-            error: "No transaction data found for the selected date range(s). Please select a different range.",
+            error: "No transaction data found for the selected date range. Please select a different range.",
         };
     }
 
     const input = {
         reportDescription: validatedFields.reportDescription,
-        fromDate1: format(fromDate1, 'yyyy-MM-dd'),
-        toDate1: format(toDate1, 'yyyy-MM-dd'),
-        transactions1: transactionsInRange1.map(t => ({
+        fromDate: format(fromDate1, 'yyyy-MM-dd'),
+        toDate: format(toDate1, 'yyyy-MM-dd'),
+        transactions: transactionsInRange1.map(t => ({
           id: t.id,
           type: t.type.toLowerCase() as 'income' | 'expense',
           amount: t.amount,
@@ -86,16 +59,6 @@ export async function handleGenerateFinanceReport(
           date: t.date,
           category: t.product,
         })),
-        fromDate2: fromDate2Str,
-        toDate2: toDate2Str,
-        transactions2: transactionsInRange2.map(t => ({
-          id: t.id,
-          type: t.type.toLowerCase() as 'income' | 'expense',
-          amount: t.amount,
-          description: t.clientName,
-          date: t.date,
-          category: t.product,
-        }))
     };
     
     const result = await generateReport(input);

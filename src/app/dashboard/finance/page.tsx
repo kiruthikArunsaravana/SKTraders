@@ -148,7 +148,6 @@ export default function FinancePage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
-  const [reportDateRange2, setReportDateRange2] = useState<DateRange | undefined>();
 
   const [reportState, formAction] = useFormState(handleGenerateFinanceReport, initialState);
 
@@ -235,7 +234,7 @@ export default function FinancePage() {
             <DialogTrigger asChild>
               <Button variant="outline">Export Report</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[625px]">
+            <DialogContent className="sm:max-w-[425px]">
               <form action={formAction}>
                  <DialogHeader>
                   <DialogTitle>Generate Financial Report</DialogTitle>
@@ -244,83 +243,46 @@ export default function FinancePage() {
                 <div className="py-4 space-y-4">
                   <input type="hidden" name="dateRange1.from" value={plDateRange?.from?.toISOString() ?? ''} />
                   <input type="hidden" name="dateRange1.to" value={plDateRange?.to?.toISOString() ?? ''} />
-                  <input type="hidden" name="dateRange2.from" value={reportDateRange2?.from?.toISOString() ?? ''} />
-                  <input type="hidden" name="dateRange2.to" value={reportDateRange2?.to?.toISOString() ?? ''} />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col space-y-2">
-                      <Label>Date Range 1</Label>
-                       <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={'outline'}
-                              className={cn(
-                                'w-full justify-start text-left font-normal'
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {plDateRange?.from ? (
-                                plDateRange.to ? (
-                                  <>
-                                    {format(plDateRange.from, 'LLL dd, y')} -{' '}
-                                    {format(plDateRange.to, 'LLL dd, y')}
-                                  </>
-                                ) : (
-                                  format(plDateRange.from, 'LLL dd, y')
-                                )
+                  
+                  <div className="flex flex-col space-y-2">
+                    <Label>Date Range</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full justify-start text-left font-normal'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {plDateRange?.from ? (
+                              plDateRange.to ? (
+                                <>
+                                  {format(plDateRange.from, 'LLL dd, y')} -{' '}
+                                  {format(plDateRange.to, 'LLL dd, y')}
+                                </>
                               ) : (
-                                <span>Pick a date range</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="range"
-                              selected={plDateRange}
-                              onSelect={setPlDateRange}
-                              numberOfMonths={2}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                    </div>
-                     <div className="flex flex-col space-y-2">
-                      <Label>Date Range 2 (Optional)</Label>
-                       <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={'outline'}
-                              className={cn(
-                                'w-full justify-start text-left font-normal'
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                               {reportDateRange2?.from ? (
-                                reportDateRange2.to ? (
-                                  <>
-                                    {format(reportDateRange2.from, 'LLL dd, y')} -{' '}
-                                    {format(reportDateRange2.to, 'LLL dd, y')}
-                                  </>
-                                ) : (
-                                  format(reportDateRange2.from, 'LLL dd, y')
-                                )
-                              ) : (
-                                <span>Pick a date range</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="range"
-                              selected={reportDateRange2}
-                              onSelect={setReportDateRange2}
-                              numberOfMonths={2}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                    </div>
+                                format(plDateRange.from, 'LLL dd, y')
+                              )
+                            ) : (
+                              <span>Pick a date range</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="range"
+                            selected={plDateRange}
+                            onSelect={setPlDateRange}
+                            numberOfMonths={2}
+                          />
+                        </PopoverContent>
+                      </Popover>
                   </div>
+                  
                   <div>
                     <Label>Report Description</Label>
-                    <Textarea name="reportDescription" defaultValue="Compare sales and profits for the two date ranges, highlighting the best performing product in each period."/>
+                    <Textarea name="reportDescription" defaultValue="Analyze sales and profits for the selected date range, highlighting the best performing product."/>
                   </div>
                    <ReportResults state={reportState} />
                 </div>
