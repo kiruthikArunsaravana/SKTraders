@@ -1,16 +1,28 @@
+'use client';
+
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { products } from '@/lib/data';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 
 export default function StockPage() {
+  const { toast } = useToast();
+
+  function handleAddStock() {
+    toast({
+      title: "Feature coming soon",
+      description: "The ability to add new stock is not yet implemented.",
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline">Stock Management</h1>
-        <Button>
+        <Button onClick={handleAddStock}>
           <PlusCircle className="mr-2 h-5 w-5" /> Add Stock
         </Button>
       </div>

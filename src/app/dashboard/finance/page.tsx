@@ -1,16 +1,28 @@
+'use client';
+
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 export default function FinancePage() {
+  const { toast } = useToast();
+
+  function handleFeatureClick(featureName: string) {
+    toast({
+      title: "Feature coming soon",
+      description: `The "${featureName}" feature is not yet implemented.`,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <div className="flex gap-2">
-          <Button variant="outline">Export PDF</Button>
-          <Button>
+          <Button variant="outline" onClick={() => handleFeatureClick('Export PDF')}>Export PDF</Button>
+          <Button onClick={() => handleFeatureClick('Add Entry')}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
           </Button>
         </div>
