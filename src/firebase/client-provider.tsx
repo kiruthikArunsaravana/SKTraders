@@ -3,7 +3,7 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -14,20 +14,35 @@ export function FirebaseClientProvider({
 }: FirebaseClientProviderProps) {
   const firebaseServices = useMemo(() => {
     const services = initializeFirebase();
-    // Non-blocking sign-in attempt for the default admin user.
-    // This allows the app to automatically log in if the credentials are correct,
-    // without blocking the UI rendering. The actual auth state is managed by the onAuthStateChanged listener.
-    signInWithEmailAndPassword(
-      services.auth,
-      'admin@example.com',
-      'SecureP@ss123'
-    ).catch((error) => {
-      // We can silently ignore errors here, as the user will be prompted to log in manually.
-      // This is just an attempt for a smoother UX.
-      if (error.code !== 'auth/invalid-credential' && error.code !== 'auth/user-not-found') {
-          console.info('Auto-login attempt info:', error.code);
+    const email = 'admin@example.com';
+    const password = 'SecureP@ss123';
+
+    // This logic ensures the admin user exists and attempts to sign them in.
+    // It's non-blocking, and the actual auth state is managed by the onAuthStateChanged listener.
+    const ensureAdminUser = async () => {
+      try {
+        // Attempt to create the user. This will fail if the user already exists.
+        await createUserWithEmailAndPassword(services.auth, email, password);
+        console.log("Admin user created and signed in automatically.");
+      } catch (error: any) {
+        // If the error code is 'auth/email-already-in-use', it means the user exists,
+        // which is expected on subsequent loads. We can then proceed to sign in.
+        if (error.code === 'auth/email-already-in-use') {
+          // Attempt to sign in, but don't block.
+          signInWithEmailAndPassword(services.auth, email, password).catch(signInError => {
+            // Silently handle potential sign-in errors during this auto-login phase.
+            // The user can still log in manually.
+             console.info('Auto-login attempt info:', (signInError as any).code);
+          });
+        } else {
+          // For other creation errors, log them for debugging.
+          console.error("Could not create admin user during initial setup:", error);
+        }
       }
-    });
+    };
+
+    ensureAdminUser();
+    
     return services;
   }, []);
 

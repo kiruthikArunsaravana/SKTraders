@@ -66,8 +66,17 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error('Login Error:', error);
       let errorMessage = 'An unknown error occurred.';
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-        errorMessage = 'Invalid credentials. Please check your email and password.';
+      if (error.code) {
+        switch (error.code) {
+            case 'auth/user-not-found':
+            case 'auth/wrong-password':
+            case 'auth/invalid-credential':
+                errorMessage = 'Invalid credentials. Please check your email and password.';
+                break;
+            default:
+                errorMessage = error.message; // Display the actual Firebase error message
+                break;
+        }
       }
       toast({
         variant: 'destructive',
