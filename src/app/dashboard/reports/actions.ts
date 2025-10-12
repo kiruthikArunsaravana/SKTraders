@@ -2,14 +2,13 @@
 
 import { z } from 'zod';
 import { generateReport } from '@/ai/flows/generate-report';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { transactions as allTransactions } from '@/lib/data';
 
 const reportSchema = z.object({
   reportDescription: z.string().min(1),
-  dateRange1From: z.string().min(1),
-  dateRange1To: z.string().min(1),
-  dateRange2From: z.string().min(1),
-  dateRange2To: z.string().min(1),
+  dateRange1From: z.string().min(1, 'Date range is required'),
+  dateRange1To: z.string().min(1, 'Date range is required'),
 });
 
 type ReportState = {
@@ -26,22 +25,49 @@ export async function handleGenerateReport(
     reportDescription: formData.get('reportDescription'),
     dateRange1From: formData.get('dateRange1.from'),
     dateRange1To: formData.get('dateRange1.to'),
-    dateRange2From: formData.get('dateRange2.from'),
-    dateRange2To: formData.get('dateRange2.to'),
   };
 
   try {
-    const validatedFields = reportSchema.parse(rawFormData);
+    const validatedFields = reportSchema.safeParse(rawFormData);
+    if (!validatedFields.success) {
+      return { report: null, error: "Validation failed: " + validatedFields.error.errors.map(e => e.message).join(', ') };
+    }
     
-    const input = {
-        reportDescription: validatedFields.reportDescription,
-        fromDate1: format(new Date(validatedFields.dateRange1From), 'yyyy-MM-dd'),
-        toDate1: format(new Date(validatedFields.dateRange1To), 'yyyy-MM-dd'),
-        fromDate2: format(new Date(validatedFields.dateRange2From), 'yyyy-MM-dd'),
-        toDate2: format(new Date(validatedFields.dateRange2To), 'yyyy-MM-dd'),
-    };
+    const { reportDescription, dateRange1From, dateRange1To } = validatedFields.data;
+
+    const fromDate = parseISO(dateRange1From);
+    const toDate = parseISO(dateRange1To);
+    toDate.setHours(23, 59, 59, 999);
+
+    const filteredTransactions = allTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= fromDate && transactionDate <= toDate;
+    });
+
+    if (filteredTransactions.length === 0) {
+      return {
+        report: null,
+        error: "No transaction data found for the selected date range. Please select a different period.",
+      };
+    }
+
+    const totalIncome = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
+    const totalExpenses = Math.abs(filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0));
+
+    const contextString = `
+      Report Request: ${reportDescription}
+      Date Range: ${format(fromDate, 'PPP')} to ${format(toDate, 'PPP')}
+      Total Income: $${totalIncome.toLocaleString()}
+      Total Expenses: $${totalExpenses.toLocaleString()}
+      Net Profit: $${(totalIncome - totalExpenses).toLocaleString()}
+      
+      Transactions:
+      ${filteredTransactions.map(t => 
+        `- ${t.date}: ${t.type} of $${Math.abs(t.amount)} for '${t.product}' related to '${t.clientName}'`
+      ).join('\n')}
+    `;
     
-    const result = await generateReport(input);
+    const result = await generateReport(contextString);
 
     if (!result.report) {
       return {

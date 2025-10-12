@@ -43,10 +43,6 @@ const reportSchema = z.object({
     from: z.date({ required_error: 'A start date is required.' }),
     to: z.date({ required_error: 'An end date is required.' }),
   }),
-  dateRange2: z.object({
-    from: z.date({ required_error: 'A start date is required.' }),
-    to: z.date({ required_error: 'An end date is required.' }),
-  }),
 });
 
 type InitialStateType = {
@@ -133,130 +129,80 @@ export default function ReportGenerator() {
   const form = useForm<z.infer<typeof reportSchema>>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
-      reportDescription: 'Compare sales and profits for the two date ranges, highlighting the best performing product in each period.',
+      reportDescription: 'Provide a summary of sales and profits, highlighting the best performing product.',
     },
   });
   
   const { watch } = form;
   const dateRange1 = watch('dateRange1');
-  const dateRange2 = watch('dateRange2');
 
   return (
     <Form {...form}>
       <form action={formAction} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Generate AI Report</CardTitle>
+            <CardTitle>Generate AI-Powered Analysis</CardTitle>
             <CardDescription>
-              Describe the report you want to generate and select two date ranges for comparison.
+              Describe the analysis you want to generate and select a date range.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <input type="hidden" name="dateRange1.from" value={dateRange1?.from?.toISOString() ?? ''} />
             <input type="hidden" name="dateRange1.to" value={dateRange1?.to?.toISOString() ?? ''} />
-            <input type="hidden" name="dateRange2.from" value={dateRange2?.from?.toISOString() ?? ''} />
-            <input type="hidden" name="dateRange2.to" value={dateRange2?.to?.toISOString() ?? ''} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="dateRange1"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date range 1</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full justify-start text-left font-normal',
-                              !field.value?.from && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value?.from ? (
-                              field.value.to ? (
-                                <>
-                                  {format(field.value.from, 'LLL dd, y')} -{' '}
-                                  {format(field.value.to, 'LLL dd, y')}
-                                </>
-                              ) : (
-                                format(field.value.from, 'LLL dd, y')
-                              )
+            
+            <FormField
+              control={form.control}
+              name="dateRange1"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date range</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={'outline'}
+                          className={cn(
+                            'w-full justify-start text-left font-normal md:w-1/2',
+                            !field.value?.from && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {field.value?.from ? (
+                            field.value.to ? (
+                              <>
+                                {format(field.value.from, 'LLL dd, y')} -{' '}
+                                {format(field.value.to, 'LLL dd, y')}
+                              </>
                             ) : (
-                              <span>Pick a date range</span>
-                            )}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="range"
-                          selected={{ from: field.value?.from, to: field.value?.to }}
-                          onSelect={field.onChange}
-                          numberOfMonths={2}
-                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="dateRange2"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date range 2</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full justify-start text-left font-normal',
-                              !field.value?.from && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value?.from ? (
-                              field.value.to ? (
-                                <>
-                                  {format(field.value.from, 'LLL dd, y')} -{' '}
-                                  {format(field.value.to, 'LLL dd, y')}
-                                </>
-                              ) : (
-                                format(field.value.from, 'LLL dd, y')
-                              )
-                            ) : (
-                              <span>Pick a date range</span>
-                            )}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="range"
-                          selected={{ from: field.value?.from, to: field.value?.to }}
-                          onSelect={field.onChange}
-                          numberOfMonths={2}
-                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
+                              format(field.value.from, 'LLL dd, y')
+                            )
+                          ) : (
+                            <span>Pick a date range</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={{ from: field.value?.from, to: field.value?.to }}
+                        onSelect={field.onChange}
+                        numberOfMonths={2}
+                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <FormField
               control={form.control}
               name="reportDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Report Description</FormLabel>
+                  <FormLabel>What do you want to analyze?</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="e.g., Compare sales, expenses, and profits..."
@@ -265,7 +211,7 @@ export default function ReportGenerator() {
                     />
                   </FormControl>
                   <FormDescription>
-                    This will be sent to an AI to generate the report.
+                    This will be sent to an AI to generate the report. Be as specific as you like.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
