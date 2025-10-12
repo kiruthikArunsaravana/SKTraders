@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -55,10 +55,18 @@ type ChartData = {
   expenses: number;
 }
 
+type PdfGenerationData = {
+  title: string;
+  dateRange: { from: Date; to: Date };
+  transactions: FinancialTransaction[];
+  chartData: ChartData[];
+};
+
 export default function ReportGenerator() {
   const { toast } = useToast();
   const [isPending, setPending] = useState(false);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [pdfData, setPdfData] = useState<PdfGenerationData | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof reportSchema>>({
@@ -68,57 +76,8 @@ export default function ReportGenerator() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof reportSchema>) {
-    setPending(true);
-    try {
-      const transactions = await getTransactionsForDateRange(values.dateRange);
-      
-      if (transactions.length === 0) {
-        toast({
-          variant: 'destructive',
-          title: 'No Data Found',
-          description: 'There are no transactions in the selected date range to generate a report.',
-        });
-        setPending(false);
-        return;
-      }
-      
-      // Process data for chart
-      const productData: { [key: string]: { income: number; expenses: number } } = {};
-      transactions.forEach(t => {
-        if (!productData[t.category]) {
-          productData[t.category] = { income: 0, expenses: 0 };
-        }
-        if (t.type === 'income') {
-          productData[t.category].income += t.amount;
-        } else {
-          productData[t.category].expenses += Math.abs(t.amount);
-        }
-      });
-      
-      const newChartData = Object.keys(productData).map(key => ({
-        name: key,
-        income: productData[key].income,
-        expenses: productData[key].expenses,
-      }));
-
-      // Set chart data and then generate PDF in a callback to ensure chart is rendered
-      setChartData(newChartData);
-      setTimeout(() => generatePdf(values.reportTitle, values.dateRange, transactions, newChartData), 100);
-
-    } catch (error) {
-      console.error("Failed to generate report:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error Generating Report',
-        description: 'An unexpected error occurred. Please try again.',
-      });
-    } finally {
-      setPending(false);
-    }
-  }
-
-  const generatePdf = (title: string, dateRange: { from: Date; to: Date }, transactions: FinancialTransaction[], localChartData: ChartData[]) => {
+  const generatePdf = (data: PdfGenerationData) => {
+    const { title, dateRange, transactions, chartData: localChartData } = data;
     const doc = new jsPDF();
 
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -201,7 +160,69 @@ export default function ReportGenerator() {
       title: "PDF Report Generated",
       description: "Your report has been successfully downloaded.",
     });
+    setPending(false);
   };
+
+  useEffect(() => {
+    if (pdfData) {
+      generatePdf(pdfData);
+      setPdfData(null); // Clear the data after generation
+    }
+  }, [pdfData]);
+
+
+  async function onSubmit(values: z.infer<typeof reportSchema>) {
+    setPending(true);
+    try {
+      const transactions = await getTransactionsForDateRange(values.dateRange);
+      
+      if (transactions.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Data Found',
+          description: 'There are no transactions in the selected date range to generate a report.',
+        });
+        setPending(false);
+        return;
+      }
+      
+      const productData: { [key: string]: { income: number; expenses: number } } = {};
+      transactions.forEach(t => {
+        if (!productData[t.category]) {
+          productData[t.category] = { income: 0, expenses: 0 };
+        }
+        if (t.type === 'income') {
+          productData[t.category].income += t.amount;
+        } else {
+          productData[t.category].expenses += Math.abs(t.amount);
+        }
+      });
+      
+      const newChartData = Object.keys(productData).map(key => ({
+        name: key,
+        income: productData[key].income,
+        expenses: productData[key].expenses,
+      }));
+
+      setChartData(newChartData);
+      setPdfData({
+        title: values.reportTitle,
+        dateRange: values.dateRange,
+        transactions,
+        chartData: newChartData,
+      });
+
+    } catch (error) {
+      console.error("Failed to generate report:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Generating Report',
+        description: 'An unexpected error occurred. Please try again.',
+      });
+      setPending(false);
+    }
+  }
+
 
   return (
     <>
