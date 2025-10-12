@@ -6,43 +6,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Gem, Wind, Box } from 'lucide-react';
 import type { Product } from '@/lib/types';
-import { getProductsAction, updateStockAction } from './actions';
+import { updateStockAction } from './actions';
 import { initialProducts } from '@/lib/data';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-
-export default function StockPage() {
-  const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isDialogOpen, setDialogOpen] = useState(false);
-
-  useEffect(() => {
-    async function loadProducts() {
-        const dbProducts = await getProductsAction();
-        // This maps the icon from the static initialProducts list to the products fetched from the db.
-        const productsWithIcons = dbProducts.map(dbProd => {
-            const initialProd = initialProducts.find(p => p.id === dbProd.id);
-            return {
-                ...dbProd,
-                icon: initialProd?.icon || Box, // Default to Box icon if not found
-            };
-        });
-        setProducts(productsWithIcons);
-    }
-    loadProducts();
-  }, []);
-
-  const productIcons = {
+const productIcons = {
     'coco-pith': Box,
     'coir-fiber': Wind,
     'husk-chips': Gem,
-  };
+};
+
+export default function StockPage() {
+  const { toast } = useToast();
+  const [isDialogOpen, setDialogOpen] = useState(false);
+
+  const firestore = useFirestore();
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'), orderBy('name', 'asc'));
+  }, [firestore]);
+
+  const { data: products, isLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
+
+  const productsWithIcons = useMemo(() => {
+    return products?.map(p => ({
+      ...p,
+      icon: productIcons[p.id as keyof typeof productIcons] || Box
+    })) || [];
+  }, [products]);
+
 
   async function handleAddStock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,10 +52,9 @@ export default function StockPage() {
     const result = await updateStockAction(formData);
     
     if (result.success && result.updatedProduct) {
-        setProducts(products.map(p => 
-          p.id === result.updatedProduct!.id ? { ...p, quantity: result.updatedProduct!.quantity } : p
-        ));
+        // UI updates automatically via useCollection
         setDialogOpen(false);
+        (event.target as HTMLFormElement).reset();
         toast({
           title: "Stock Added",
           description: `${formData.get('quantity')} units of ${result.updatedProduct.name} have been added.`,
@@ -62,7 +63,7 @@ export default function StockPage() {
         toast({
             variant: 'destructive',
             title: 'Error updating stock',
-            description: result.error || 'An unknown error occurred',
+            description: result.error as string || 'An unknown error occurred',
         });
     }
   }
@@ -127,8 +128,15 @@ export default function StockPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => {
-                const Icon = productIcons[product.id] || Box;
+              {isLoading && (
+                  <>
+                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                  </>
+              )}
+              {!isLoading && productsWithIcons.map((product) => {
+                const Icon = product.icon || Box;
                 return (
                   <TableRow key={product.id}>
                     <TableCell>
@@ -148,6 +156,11 @@ export default function StockPage() {
                   </TableRow>
                 );
               })}
+              {!isLoading && productsWithIcons.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center">No products found.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

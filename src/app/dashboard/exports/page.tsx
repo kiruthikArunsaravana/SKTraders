@@ -6,35 +6,39 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { format, isWithinInterval } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Export } from '@/lib/types';
-import { addExportAction, getExportsAction } from './actions';
+import { addExportAction } from './actions';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ExportsPage() {
   const { toast } = useToast();
-  const [exports, setExports] = useState<Export[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
-  useEffect(() => {
-    async function loadExports() {
-      const initialExports = await getExportsAction();
-      setExports(initialExports);
-    }
-    loadExports();
-  }, []);
+  const firestore = useFirestore();
+
+  const exportsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'exports'), orderBy('date', 'desc'));
+  }, [firestore]);
+
+  const { data: exports, isLoading } = useCollection<Export>(exportsQuery);
 
   const filteredExports = useMemo(() => {
+    if (!exports) return [];
     if (!dateRange || !dateRange.from || !dateRange.to) {
       return exports;
     }
@@ -43,7 +47,7 @@ export default function ExportsPage() {
     to.setHours(23, 59, 59, 999);
 
     return exports.filter(exp => {
-      const expDate = parseISO(exp.date);
+      const expDate = exp.date.toDate();
       return isWithinInterval(expDate, { start: from, end: to });
     });
   }, [exports, dateRange]);
@@ -59,8 +63,9 @@ export default function ExportsPage() {
     const result = await addExportAction(formData);
 
     if (result.success && result.newExport) {
-      setExports(prevExports => [...prevExports, result.newExport!].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      // UI updates automatically via useCollection
       setDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
       toast({
         title: "Export Order Added",
         description: `Order for ${result.newExport.buyerName} has been successfully added.`,
@@ -69,7 +74,7 @@ export default function ExportsPage() {
       toast({
         variant: "destructive",
         title: "Error adding export",
-        description: result.error || "An unknown error occurred.",
+        description: (result.error as string) || "An unknown error occurred.",
       });
     }
   }
@@ -102,7 +107,7 @@ export default function ExportsPage() {
       exp.buyerName,
       exp.country,
       exp.port,
-      format(new Date(exp.date), 'PP'),
+      format(exp.date.toDate(), 'PP'),
       `$${exp.value.toLocaleString()}`
     ]);
 
@@ -203,7 +208,13 @@ export default function ExportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExports.length > 0 ? (
+              {isLoading && (
+                  <>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                  </>
+              )}
+              {!isLoading && filteredExports.length > 0 ? (
                 filteredExports.map((exp) => (
                   <TableRow key={exp.id}>
                     <TableCell>
@@ -213,11 +224,11 @@ export default function ExportsPage() {
                       <Badge variant="outline">{exp.country}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{exp.port}</TableCell>
-                    <TableCell className="hidden md:table-cell">{format(new Date(exp.date), 'PP')}</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(exp.date.toDate(), 'PP')}</TableCell>
                     <TableCell className="text-right">${exp.value.toLocaleString()}</TableCell>
                   </TableRow>
                 ))
-              ) : (
+              ) : !isLoading && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">
                     No export orders to display.
