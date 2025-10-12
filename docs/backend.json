@@ -1,0 +1,98 @@
+{
+    "entities": {
+        "user": {
+            "title": "User",
+            "description": "A user of the application.",
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "The user's email address."
+                },
+                "displayName": {
+                    "type": "string",
+                    "description": "The user's display name."
+                }
+            },
+            "required": ["email"]
+        },
+        "client": {
+            "title": "Client",
+            "description": "A client or customer of SK Traders.",
+            "type": "object",
+            "properties": {
+                "name": { "type": "string", "description": "Name of the client." },
+                "email": { "type": "string", "format": "email", "description": "Client's email address." },
+                "company": { "type": "string", "description": "Client's company name." },
+                "country": { "type": "string", "description": "Country where the client is located." },
+                "totalSales": { "type": "number", "description": "Total sales value attributed to this client." },
+                "lastPurchaseDate": { "type": "string", "format": "date-time", "description": "Date of the last purchase made by the client." }
+            },
+            "required": ["name", "email", "company", "country", "lastPurchaseDate"]
+        },
+        "product": {
+            "title": "Product",
+            "description": "A product sold by SK Traders.",
+            "type": "object",
+            "properties": {
+                "name": { "type": "string", "description": "Name of the product." },
+                "quantity": { "type": "number", "description": "Available stock quantity." },
+                "costPrice": { "type": "number", "description": "The cost price of the product." },
+                "sellingPrice": { "type": "number", "description": "The selling price of the product." }
+            },
+            "required": ["name", "quantity", "costPrice", "sellingPrice"]
+        },
+        "financialTransaction": {
+            "title": "Financial Transaction",
+            "description": "An income or expense transaction.",
+            "type": "object",
+            "properties": {
+                "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of transaction." },
+                "amount": { "type": "number", "description": "Transaction amount. Positive for income, negative for expense." },
+                "description": { "type": "string", "description": "A brief description of the transaction." },
+                "category": { "type": "string", "description": "The category of the transaction (e.g., product name or expense type)." },
+                "date": { "type": "string", "format": "date-time", "description": "The date of the transaction." }
+            },
+            "required": ["type", "amount", "description", "category", "date"]
+        },
+        "export": {
+            "title": "Export",
+            "description": "An export order.",
+            "type": "object",
+            "properties": {
+                "buyerName": { "type": "string", "description": "The name of the buyer for the export." },
+                "country": { "type": "string", "description": "The destination country." },
+                "port": { "type": "string", "description": "The destination port." },
+                "value": { "type": "number", "description": "The total value of the export order." },
+                "date": { "type": "string", "format": "date-time", "description": "The date of the export." }
+            },
+            "required": ["buyerName", "country", "port", "value", "date"]
+        }
+    },
+    "auth": {
+        "providers": ["password"]
+    },
+    "firestore": {
+        "/users/{userId}": {
+            "schema": { "$ref": "#/backend/entities/user" },
+            "description": "Stores public profiles for users."
+        },
+        "/clients/{clientId}": {
+            "schema": { "$ref": "#/backend/entities/client" },
+            "description": "Stores information about each client."
+        },
+        "/products/{productId}": {
+            "schema": { "$ref": "#/backend/entities/product" },
+            "description": "Stores stock levels and pricing for each product."
+        },
+        "/financial_transactions/{transactionId}": {
+            "schema": { "$ref": "#/backend/entities/financialTransaction" },
+            "description": "Stores all income and expense transactions."
+        },
+        "/exports/{exportId}": {
+            "schema": { "$ref": "#/backend/entities/export" },
+            "description": "Stores all export orders."
+        }
+    }
+}

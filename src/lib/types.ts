@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 
 export type Client = {
   id: string;
@@ -6,7 +7,7 @@ export type Client = {
   company: string;
   email: string;
   totalSales: number;
-  lastPurchaseDate: string;
+  lastPurchaseDate: Timestamp;
   country: string;
 };
 
@@ -16,17 +17,7 @@ export type Product = {
   quantity: number;
   costPrice: number;
   sellingPrice: number;
-  icon: LucideIcon;
-};
-
-export type Transaction = {
-  id: string;
-  clientName: string;
-  clientAvatarUrl: string;
-  product: 'Coco Pith' | 'Coir Fiber' | 'Husk Chips';
-  amount: number;
-  date: string;
-  type: 'Income' | 'Expense';
+  icon?: LucideIcon; // Icon is UI-specific, making it optional
 };
 
 export type FinancialTransaction = {
@@ -34,7 +25,7 @@ export type FinancialTransaction = {
   type: 'income' | 'expense';
   amount: number;
   description: string;
-  date: string;
+  date: Timestamp;
   category: string;
 };
 
@@ -44,7 +35,7 @@ export type Export = {
   country: string;
   port: string;
   value: number;
-  date: string;
+  date: Timestamp;
 };
 
 export interface NavItem {
