@@ -1,10 +1,12 @@
 'use server';
 
-import { addDoc, collection } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { z } from 'zod';
 import { getAdminSdks } from '@/firebase/server';
 import type { Client } from '@/lib/types';
 import { Timestamp } from 'firebase-admin/firestore';
+import { addDoc } from 'firebase-admin/firestore';
+
 
 // Schema for validating form data
 const clientSchema = z.object({
