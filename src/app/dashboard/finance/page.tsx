@@ -2,12 +2,12 @@
 
 'use client';
 
-import { PlusCircle, Calendar as CalendarIcon, Filter, Wand2, Loader2 } from 'lucide-react';
+import { PlusCircle, Calendar as CalendarIcon, Filter, Wand2, Loader2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,9 @@ import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 import { handleGenerateFinanceReport } from './actions';
 import { Textarea } from '@/components/ui/textarea';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const expenseCategories = [
   { id: 'husk', name: 'Husk' },
@@ -156,6 +159,8 @@ export default function FinancePage() {
 
   const [reportState, formAction] = useFormState(handleGenerateFinanceReport, initialState);
 
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
 
   const handleAddEntry = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -213,19 +218,105 @@ export default function FinancePage() {
     });
   }, [transactions, plFilter, plDateRange]);
 
-  const { totalIncome, totalExpenses, netProfit } = useMemo(() => {
-    const totalIncome = filteredTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = filteredTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+  const { totalIncome, totalExpenses, netProfit, chartData } = useMemo(() => {
+    const incomeByDate: { [key: string]: number } = {};
+    const expenseByDate: { [key: string]: number } = {};
+    let totalIncome = 0;
+    let totalExpenses = 0;
+
+    filteredTransactions.forEach(t => {
+      const date = format(new Date(t.date), 'yyyy-MM-dd');
+      if (t.type === 'income') {
+        incomeByDate[date] = (incomeByDate[date] || 0) + t.amount;
+        totalIncome += t.amount;
+      } else {
+        expenseByDate[date] = (expenseByDate[date] || 0) + Math.abs(t.amount);
+        totalExpenses += t.amount;
+      }
+    });
+
+    const dates = [...new Set([...Object.keys(incomeByDate), ...Object.keys(expenseByDate)])].sort();
+    const chartData = dates.map(date => ({
+      date: format(new Date(date), 'MMM d'),
+      income: incomeByDate[date] || 0,
+      expenses: expenseByDate[date] || 0,
+    }));
+
     return {
       totalIncome,
       totalExpenses: Math.abs(totalExpenses),
       netProfit: totalIncome + totalExpenses,
+      chartData
     };
   }, [filteredTransactions]);
+
+  const handleGeneratePdf = async () => {
+    const doc = new jsPDF();
+    
+    // Add header
+    doc.setFont('Playfair Display', 'bold');
+    doc.setFontSize(22);
+    doc.text('HuskTrack Financial Report', 14, 22);
+    doc.setFont('PT Sans', 'normal');
+    doc.setFontSize(12);
+    doc.text(`For SK Traders`, 14, 30);
+
+    const dateRangeText = plDateRange?.from && plDateRange?.to 
+      ? `Date Range: ${format(plDateRange.from, 'PPP')} - ${format(plDateRange.to, 'PPP')}`
+      : `Date: ${format(new Date(), 'PPP')}`;
+    doc.text(dateRangeText, 14, 36);
+
+    // Add chart
+    const chartElement = chartContainerRef.current?.querySelector('canvas');
+    if (chartElement) {
+        try {
+            const imgData = chartElement.toDataURL('image/png');
+            doc.addImage(imgData, 'PNG', 14, 45, 180, 80);
+        } catch (error) {
+            console.error("Error generating chart image:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Could not generate chart image',
+                description: 'The chart could not be converted to an image for the PDF.',
+            });
+        }
+    }
+
+
+    // Add table
+    const tableData = filteredTransactions.map(t => {
+        const income = t.type === 'income' ? `$${t.amount.toLocaleString()}` : '-';
+        const expense = t.type === 'expense' ? `$${Math.abs(t.amount).toLocaleString()}` : '-';
+        const profitLoss = t.type === 'income' ? t.amount : t.amount;
+        return [format(new Date(t.date), 'PP'), income, expense, profitLoss >= 0 ? `$${profitLoss.toLocaleString()}`: `-$${Math.abs(profitLoss).toLocaleString()}`];
+    });
+
+    (doc as any).autoTable({
+      startY: 135,
+      head: [['Date', 'Income', 'Expense', 'Profit/Loss']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [40, 50, 80] },
+    });
+
+    // Add summary
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(14);
+    doc.text('Summary', 14, finalY);
+    doc.setFontSize(12);
+    doc.text(`Total Income: $${totalIncome.toLocaleString()}`, 14, finalY + 8);
+    doc.text(`Total Expenses: -$${totalExpenses.toLocaleString()}`, 14, finalY + 16);
+    doc.setFontSize(14);
+    doc.setFont('PT Sans', 'bold');
+    doc.text(`Net Profit: $${netProfit.toLocaleString()}`, 14, finalY + 24);
+
+    doc.save(`HuskTrack-Financial-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+
+    toast({
+        title: "PDF Generated",
+        description: "Your financial report has been successfully downloaded.",
+    });
+  };
 
   const todaysIncome = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'income');
   const todaysExpenses = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'expense');
@@ -237,7 +328,7 @@ export default function FinancePage() {
         <div className="flex gap-2">
           <Dialog open={isExportDialogOpen} onOpenChange={setExportDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">Generate Report</Button>
+              <Button variant="outline">Generate AI Report</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <form action={formAction}>
@@ -415,6 +506,7 @@ export default function FinancePage() {
               <div className="flex justify-between items-center">
                 <CardDescription>Analyze your profit and loss over different periods.</CardDescription>
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleGeneratePdf}><Download className="mr-2 h-4 w-4" /> Download PDF</Button>
                   <Button variant={plFilter === 'monthly' ? 'default' : 'outline'} size="sm" onClick={() => { setPlFilter('monthly'); setPlDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }); }}>Monthly</Button>
                   <Button variant={plFilter === 'yearly' ? 'default' : 'outline'} size="sm" onClick={() => { setPlFilter('yearly'); setPlDateRange({ from: startOfYear(new Date()), to: endOfYear(new Date()) }); }}>Yearly</Button>
                   <Popover>
@@ -441,6 +533,26 @@ export default function FinancePage() {
                 <Card className="bg-red-50 dark:bg-red-900/20"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">Total Expenses</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-600 dark:text-red-500">-${totalExpenses.toLocaleString()}</p></CardContent></Card>
                 <Card className={netProfit >= 0 ? "bg-blue-50 dark:bg-blue-900/20" : "bg-red-50 dark:bg-red-900/20"}><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">Net Profit</CardTitle></CardHeader><CardContent><p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600 dark:text-blue-500' : 'text-red-600 dark:text-red-500'}`}>${netProfit.toLocaleString()}</p></CardContent></Card>
               </div>
+                <div ref={chartContainerRef} className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value / 1000}k`} />
+                            <Tooltip
+                                cursor={{ fill: 'hsl(var(--muted))' }}
+                                contentStyle={{
+                                    backgroundColor: 'hsl(var(--card))',
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: 'var(--radius)'
+                                }}
+                            />
+                            <Legend iconSize={10} />
+                            <Bar dataKey="income" fill="hsl(var(--chart-1))" name="Income" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="expenses" fill="hsl(var(--chart-2))" name="Expenses" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
               <Table>
                 <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Description</TableHead><TableHead>Category/Product</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
