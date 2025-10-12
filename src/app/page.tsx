@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const loginBg = placeholderImages.find((p) => p.id === 'login-background');
@@ -54,36 +54,56 @@ export default function LoginPage() {
     }
 
     try {
+      // First, try to sign in.
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged in the layout will handle the redirect
       toast({
         title: 'Login Successful',
         description: 'Redirecting to dashboard...',
       });
-      // The redirect is handled by the effect in DashboardLayout
-      // but we can push it here for a faster transition.
       router.push('/dashboard');
     } catch (error: any) {
-      console.error('Login Error:', error);
-      let errorMessage = 'An unknown error occurred.';
-      if (error.code) {
-        switch (error.code) {
-            case 'auth/user-not-found':
-            case 'auth/wrong-password':
-            case 'auth/invalid-credential':
-                errorMessage = 'Invalid credentials. Please check your email and password.';
-                break;
-            default:
-                errorMessage = error.message; // Display the actual Firebase error message
-                break;
+      // If sign-in fails because the user is not found, try to create the user.
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+          toast({
+            title: 'Admin Account Created',
+            description: 'Your admin account has been created. Welcome!',
+          });
+           router.push('/dashboard');
+        } catch (creationError: any) {
+            // Handle errors during creation (e.g. weak password)
+            let errorMessage = creationError.message || 'An unknown error occurred during account creation.';
+            toast({
+                variant: 'destructive',
+                title: 'Account Creation Failed',
+                description: errorMessage,
+            });
         }
+      } else {
+         // Handle other sign-in errors (wrong password, etc.)
+        let errorMessage = 'An unknown error occurred.';
+         if (error.code) {
+            switch (error.code) {
+                case 'auth/wrong-password':
+                    errorMessage = 'Invalid password. Please try again.';
+                    break;
+                case 'auth/too-many-requests':
+                    errorMessage = 'Too many login attempts. Please wait a few minutes before trying again.';
+                    break;
+                default:
+                    errorMessage = error.message;
+                    break;
+            }
+        }
+        toast({
+            variant: 'destructive',
+            title: 'Login Failed',
+            description: errorMessage,
+        });
       }
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: errorMessage,
-      });
-      setPending(false);
+    } finally {
+        setPending(false);
     }
   };
 
@@ -150,7 +170,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <div className="mt-4 text-xs text-center text-muted-foreground">
-            <p>Use the default credentials. The password is "SecureP@ss123"</p>
+            <p>Use default credentials. An admin account will be created on first login.</p>
           </div>
         </CardContent>
       </Card>
