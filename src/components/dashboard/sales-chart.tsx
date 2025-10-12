@@ -8,8 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getSalesByMonthAction } from '@/app/dashboard/actions';
-import { useEffect, useState } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, Timestamp } from 'firebase/firestore';
+import { subMonths } from 'date-fns';
+import { useMemo } from 'react';
+import type { FinancialTransaction } from '@/lib/types';
+
 
 type SalesByMonth = {
     month: string;
@@ -18,11 +22,40 @@ type SalesByMonth = {
 };
 
 export default function SalesChart() {
-  const [salesData, setSalesData] = useState<SalesByMonth[]>([]);
-  
-  useEffect(() => {
-    getSalesByMonthAction().then(setSalesData);
-  }, []);
+  const firestore = useFirestore();
+
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const oneYearAgo = subMonths(new Date(), 12);
+    return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(oneYearAgo)));
+  }, [firestore]);
+
+  const { data: transactions } = useCollection<FinancialTransaction>(transactionsQuery);
+
+  const salesData = useMemo(() => {
+    const monthNames = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
+    const result: SalesByMonth[] = monthNames.map((m) => ({ month: m, sales: 0, expenses: 0 }));
+
+    if (!transactions) return result;
+
+    transactions.forEach((doc) => {
+      const data = doc;
+      const monthIndex = data.date.toDate().getMonth();
+      const monthName = monthNames[monthIndex];
+      if (monthName) {
+        const existing = result.find((r) => r.month === monthName);
+        if (existing) {
+          if (data.type === 'income') {
+            existing.sales += data.amount;
+          } else {
+            existing.expenses += Math.abs(data.amount);
+          }
+        }
+      }
+    });
+    return result;
+  }, [transactions]);
+
 
   return (
     <Card className="xl:col-span-2">

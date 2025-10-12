@@ -57,9 +57,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { addTransactionAction } from './actions';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const expenseCategories = [
@@ -100,33 +99,43 @@ export default function FinancePage() {
 
   const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    formData.set(
-      'date',
-      entryDate ? format(entryDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
-    );
-
-    const result = await addTransactionAction(formData);
-
-    if (result.success && result.newTransaction) {
-      // Data will be updated automatically by useCollection
-      setAddEntryDialogOpen(false);
-      (event.target as HTMLFormElement).reset();
-      setEntryDate(new Date()); // Reset date for next entry
-      toast({
-        title: 'Entry Added',
-        description: `A new ${result.newTransaction.type} entry for $${Math.abs(
-          result.newTransaction.amount
-        )} has been recorded.`,
-      });
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Error adding transaction',
-        description:
-          (result.error as string) || 'An unknown error occurred.',
-      });
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
     }
+    const formData = new FormData(event.currentTarget);
+    
+    const type = formData.get('type') as 'income' | 'expense';
+    const amount = parseFloat(formData.get('amount') as string);
+    const description = formData.get('description') as string;
+    const category = formData.get('category') as string;
+    const date = entryDate || new Date();
+
+    if (!type || !amount || !description || !category || !date) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill all fields.' });
+      return;
+    }
+
+    const finalAmount = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
+  
+    const newTransactionData = {
+      type,
+      amount: finalAmount,
+      description,
+      category,
+      date: Timestamp.fromDate(date),
+    };
+    
+    const transactionsCollection = collection(firestore, 'financial_transactions');
+    addDocumentNonBlocking(transactionsCollection, newTransactionData);
+
+    setAddEntryDialogOpen(false);
+    (event.target as HTMLFormElement).reset();
+    setEntryDate(new Date()); // Reset date for next entry
+    toast({
+      title: 'Entry Added',
+      description: `A new ${type} entry for $${Math.abs(amount)} has been recorded.`,
+    });
   };
 
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {

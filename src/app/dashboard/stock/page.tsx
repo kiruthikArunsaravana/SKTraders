@@ -6,17 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Gem, Wind, Box } from 'lucide-react';
 import type { Product } from '@/lib/types';
-import { updateStockAction } from './actions';
 import { initialProducts } from '@/lib/data';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const productIcons = {
@@ -35,6 +34,25 @@ export default function StockPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'products'), orderBy('name', 'asc'));
   }, [firestore]);
+  
+  // Effect to initialize products if the collection is empty
+  useEffect(() => {
+    if (!firestore) return;
+    const productsCollectionRef = collection(firestore, 'products');
+
+    runTransaction(firestore, async (transaction) => {
+      for (const product of initialProducts) {
+        const productRef = doc(firestore, 'products', product.id);
+        const productDoc = await transaction.get(productRef);
+        if (!productDoc.exists()) {
+          const { icon, ...dbProduct } = product;
+          transaction.set(productRef, dbProduct);
+        }
+      }
+    }).catch(error => {
+        console.error("Failed to initialize products:", error);
+    });
+  }, [firestore]);
 
   const { data: products, isLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
 
@@ -48,22 +66,45 @@ export default function StockPage() {
 
   async function handleAddStock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
-    const result = await updateStockAction(formData);
+    const productId = formData.get('product') as string;
+    const quantity = parseInt(formData.get('quantity') as string, 10);
     
-    if (result.success && result.updatedProduct) {
-        // UI updates automatically via useCollection
+    if (!productId || isNaN(quantity)) {
+        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a product and enter a valid quantity.' });
+        return;
+    }
+    
+    const productRef = doc(firestore, 'products', productId);
+
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const productDoc = await transaction.get(productRef);
+            if (!productDoc.exists()) {
+                throw new Error("Product document not found!");
+            }
+            const currentQuantity = productDoc.data().quantity || 0;
+            const newQuantity = currentQuantity + quantity;
+            transaction.update(productRef, { quantity: newQuantity });
+        });
+
         setDialogOpen(false);
         (event.target as HTMLFormElement).reset();
         toast({
           title: "Stock Added",
-          description: `${formData.get('quantity')} units of ${result.updatedProduct.name} have been added.`,
+          description: `${quantity} units have been added to ${productId}.`,
         });
-    } else {
-        toast({
+
+    } catch (error) {
+         toast({
             variant: 'destructive',
             title: 'Error updating stock',
-            description: result.error as string || 'An unknown error occurred',
+            description: (error as Error).message || 'An unknown error occurred',
         });
     }
   }

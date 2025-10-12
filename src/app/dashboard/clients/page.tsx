@@ -10,10 +10,9 @@ import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addClientAction } from './actions';
 import type { Client } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -23,7 +22,6 @@ export default function ClientsPage() {
   
   const firestore = useFirestore();
 
-  // Memoize the Firestore query to prevent re-renders
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'clients'), orderBy('name', 'asc'));
@@ -34,25 +32,39 @@ export default function ClientsPage() {
 
   async function handleAddClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    
-    const result = await addClientAction(formData);
-
-    if (result.success && result.newClient) {
-        // The UI will update automatically via the useCollection hook.
-        setDialogOpen(false);
-        (event.target as HTMLFormElement).reset();
-        toast({
-          title: "Client Added",
-          description: `${result.newClient.name} has been successfully added.`,
-        });
-    } else {
-         toast({
-            variant: "destructive",
-            title: "Error Adding Client",
-            description: Array.isArray(result.error) ? result.error.join(', ') : (result.error as string || "Could not add client."),
-        });
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
     }
+    const formData = new FormData(event.currentTarget);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const company = formData.get('company') as string;
+    const country = formData.get('country') as string;
+    
+    if (!name || !email || !company || !country) {
+       toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields.' });
+       return;
+    }
+
+    const clientsCollection = collection(firestore, 'clients');
+    const newClientData = {
+      name,
+      email,
+      company,
+      country,
+      totalSales: 0,
+      lastPurchaseDate: Timestamp.now(),
+    };
+    
+    addDocumentNonBlocking(clientsCollection, newClientData);
+
+    setDialogOpen(false);
+    (event.target as HTMLFormElement).reset();
+    toast({
+      title: "Client Added",
+      description: `${name} has been successfully added.`,
+    });
   }
 
   return (

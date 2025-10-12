@@ -17,24 +17,20 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { getRecentTransactionsAction } from '@/app/dashboard/actions';
-import { useEffect, useState } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import type { FinancialTransaction } from '@/lib/types';
 
-type RecentTransaction = {
-    id: string;
-    clientName: string;
-    product: string;
-    amount: number;
-    type: 'Income' | 'Expense';
-    clientAvatarUrl: string;
-};
 
 export default function RecentTransactions() {
-  const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
-  
-  useEffect(() => {
-    getRecentTransactionsAction().then(setTransactions);
-  }, []);
+  const firestore = useFirestore();
+
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'), limit(5));
+  }, [firestore]);
+
+  const { data: transactions } = useCollection<FinancialTransaction>(transactionsQuery);
 
   return (
     <Card>
@@ -53,26 +49,26 @@ export default function RecentTransactions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.length > 0 ? (
+            {transactions && transactions.length > 0 ? (
               transactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="hidden h-9 w-9 sm:flex">
-                        <AvatarImage src={transaction.clientAvatarUrl} alt="Avatar" />
-                        <AvatarFallback>{transaction.clientName.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={`https://picsum.photos/seed/${transaction.id}/40/40`} alt="Avatar" />
+                        <AvatarFallback>{transaction.description.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <div className="font-medium">{transaction.clientName}</div>
+                      <div className="font-medium">{transaction.description}</div>
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge className="text-xs" variant={transaction.type === 'Income' ? 'default' : 'destructive'}>
-                      {transaction.type}
+                    <Badge className="text-xs" variant={transaction.type === 'income' ? 'default' : 'destructive'}>
+                      {transaction.type === 'income' ? 'Income' : 'Expense'}
                     </Badge>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">{transaction.product}</TableCell>
-                  <TableCell className={`text-right font-medium ${transaction.type === 'Income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {transaction.type === 'Income' ? '+' : ''}
+                  <TableCell className="hidden sm:table-cell">{transaction.category}</TableCell>
+                  <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                      {transaction.type === 'income' ? '+' : ''}
                       ${transaction.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </TableCell>
                 </TableRow>

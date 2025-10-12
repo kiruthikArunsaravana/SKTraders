@@ -18,9 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Export } from '@/lib/types';
-import { addExportAction } from './actions';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ExportsPage() {
@@ -59,24 +58,39 @@ export default function ExportsPage() {
 
   async function handleAddExportOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const result = await addExportAction(formData);
-
-    if (result.success && result.newExport) {
-      // UI updates automatically via useCollection
-      setDialogOpen(false);
-      (event.target as HTMLFormElement).reset();
-      toast({
-        title: "Export Order Added",
-        description: `Order for ${result.newExport.buyerName} has been successfully added.`,
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error adding export",
-        description: (result.error as string) || "An unknown error occurred.",
-      });
+     if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
     }
+
+    const formData = new FormData(event.currentTarget);
+    const buyerName = formData.get('buyerName') as string;
+    const country = formData.get('country') as string;
+    const port = formData.get('port') as string;
+    const value = parseFloat(formData.get('value') as string);
+    
+    if (!buyerName || !country || !port || !value) {
+       toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
+       return;
+    }
+    
+    const exportsCollection = collection(firestore, 'exports');
+    const newExportData = {
+      buyerName,
+      country,
+      port,
+      value,
+      date: Timestamp.now(),
+    };
+    
+    addDocumentNonBlocking(exportsCollection, newExportData);
+
+    setDialogOpen(false);
+    (event.target as HTMLFormElement).reset();
+    toast({
+      title: "Export Order Added",
+      description: `Order for ${buyerName} has been successfully added.`,
+    });
   }
   
   const handleGeneratePdf = () => {
