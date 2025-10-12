@@ -53,18 +53,33 @@ export async function handleGenerateFinanceReport(
         };
     }
 
+    // New simplified method: create a context string for the AI
+    let reportContext = `Date Range: From ${format(fromDate, 'yyyy-MM-dd')} to ${format(toDate, 'yyyy-MM-dd')}\n\n`;
+    reportContext += "Transactions:\n";
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+
+    transactionsInRange.forEach(t => {
+        const transactionDate = format(parseISO(t.date), 'yyyy-MM-dd');
+        const type = t.type.toLowerCase();
+        reportContext += `- ${transactionDate}: ${t.clientName} (${t.product}) - Amount: ${t.amount} (${type})\n`;
+        if (type === 'income') {
+            totalIncome += t.amount;
+        } else {
+            totalExpenses += t.amount;
+        }
+    });
+
+    reportContext += `\nSummary:\n`;
+    reportContext += `Total Income: ${totalIncome.toLocaleString()}\n`;
+    reportContext += `Total Expenses: ${totalExpenses.toLocaleString()}\n`;
+    reportContext += `Net Profit: ${(totalIncome + totalExpenses).toLocaleString()}\n`;
+
+
     const input = {
         reportDescription: reportDescription,
-        fromDate: format(fromDate, 'yyyy-MM-dd'),
-        toDate: format(toDate, 'yyyy-MM-dd'),
-        transactions: transactionsInRange.map(t => ({
-          id: t.id,
-          type: t.type.toLowerCase() as 'income' | 'expense',
-          amount: t.amount,
-          description: t.clientName,
-          date: format(parseISO(t.date), 'yyyy-MM-dd'),
-          category: t.product,
-        })),
+        reportContext: reportContext,
     };
     
     const result = await generateReport(input);

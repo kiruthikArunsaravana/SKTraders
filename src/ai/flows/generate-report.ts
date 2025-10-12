@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * @fileOverview Generates a report on sales, expenses, and profits for a given date range based on a natural language description.
+ * @fileOverview Generates a report on sales, expenses, and profits based on a pre-formatted context string.
  *
  * - generateReport - A function that generates the report.
  * - GenerateReportInput - The input type for the generateReport function.
@@ -11,24 +11,13 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const TransactionSchema = z.object({
-  id: z.string(),
-  type: z.enum(['income', 'expense']),
-  amount: z.number(),
-  description: z.string(),
-  date: z.string(),
-  category: z.string(),
-});
-
 const GenerateReportInputSchema = z.object({
   reportDescription: z
     .string()
     .describe(
       'A natural language description of the report to generate, including what aspects of sales, expenses, and profits to include.'
     ),
-  fromDate: z.string().describe('The start date for the date range (yyyy-MM-dd).'),
-  toDate: z.string().describe('The end date for the date range (yyyy-MM-dd).'),
-  transactions: z.array(TransactionSchema).describe('An array of transactions for the date range.'),
+  reportContext: z.string().describe('A pre-formatted string containing all the data and context for the report.'),
 });
 export type GenerateReportInput = z.infer<typeof GenerateReportInputSchema>;
 
@@ -47,19 +36,12 @@ const generateReportPrompt = ai.definePrompt({
   output: {schema: GenerateReportOutputSchema},
   prompt: `You are an expert business analyst.
 
-You are provided with a description of a report to generate, as well as a date range and its corresponding transaction data.
+You are provided with a description of a report to generate, as well as a context string containing all the relevant financial data.
 
-Based on the description and the data, create a report that analyzes sales, expenses, and profits for the date range.
+Based on the description and the data, create a report that analyzes sales, expenses, and profits.
 
-Date Range: From {{fromDate}} to {{toDate}}
-Transactions:
-{{#if transactions}}
-{{#each transactions}}
-- {{this.date}}: {{this.description}} ({{this.category}}) - Amount: {{this.amount}} ({{this.type}})
-{{/each}}
-{{else}}
-No transactions in this period.
-{{/if}}
+Report Context:
+{{{reportContext}}}
 
 Report Description: {{reportDescription}}
 
