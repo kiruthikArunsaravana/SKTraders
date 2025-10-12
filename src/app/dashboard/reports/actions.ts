@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { generateReport } from '@/ai/flows/generate-report';
 import { format, parseISO } from 'date-fns';
-import { transactions as allTransactions } from '@/lib/data';
+import { transactions } from '@/lib/data';
 
 const reportSchema = z.object({
   reportDescription: z.string().min(1),
@@ -39,7 +39,7 @@ export async function handleGenerateReport(
     const toDate = parseISO(dateRange1To);
     toDate.setHours(23, 59, 59, 999);
 
-    const filteredTransactions = allTransactions.filter(t => {
+    const filteredTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
         return transactionDate >= fromDate && transactionDate <= toDate;
     });
@@ -47,7 +47,7 @@ export async function handleGenerateReport(
     if (filteredTransactions.length === 0) {
       return {
         report: null,
-        error: "No transaction data found for the selected date range. Please select a different period.",
+        error: "No transaction data found for the selected date range. Please select a different period or add some transactions.",
       };
     }
 
@@ -63,7 +63,7 @@ export async function handleGenerateReport(
       
       Transactions:
       ${filteredTransactions.map(t => 
-        `- ${t.date}: ${t.type} of $${Math.abs(t.amount)} for '${t.product}' related to '${t.clientName}'`
+        `- ${format(new Date(t.date), 'yyyy-MM-dd')}: ${t.type} of $${Math.abs(t.amount)} for '${t.product}' related to '${t.clientName}'`
       ).join('\n')}
     `;
     
