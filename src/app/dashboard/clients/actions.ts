@@ -3,14 +3,32 @@
 import type { Client } from '@/lib/types';
 import { z } from 'zod';
 
-// This is where you would import your database connection library
-// For example: import { pool } from '@/lib/mysql';
+// STEP 1: Install a MySQL library for Node.js
+// In your terminal, run: npm install mysql2
+//
+// STEP 2: Import the library and create a database connection
+// You would typically do this in a separate file (e.g., src/lib/db.ts)
+/*
+import mysql from 'mysql2/promise';
 
-// Mock database - replace this with your actual database logic
+const pool = mysql.createPool({
+  host: 'localhost', // Your MySQL host
+  user: 'your_user', // Your MySQL username
+  password: 'your_password', // Your MySQL password
+  database: 'your_database_name',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+*/
+
+// For demonstration, we'll continue using an in-memory array.
+// When you connect to your database, you can remove this mock data.
 const clients: Client[] = [];
 let lastId = 0;
 
-// Schema for validating form data
+
+// Schema for validating form data remains the same
 const clientSchema = z.object({
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Invalid email address"),
@@ -18,19 +36,35 @@ const clientSchema = z.object({
     country: z.string().min(1, "Country is required"),
 });
 
+/**
+ * This function runs on the server and fetches clients from the database.
+ */
 export async function getClientsAction(): Promise<Client[]> {
-  // In a real app, you would fetch clients from your database here.
-  // Example:
-  // const [rows] = await pool.query('SELECT * FROM clients');
-  // return rows as Client[];
-  
-  return Promise.resolve(clients);
+  // STEP 3: Replace mock data with a database query
+  try {
+    // Example of how you would fetch data from your MySQL database:
+    /*
+    const [rows] = await pool.query('SELECT * FROM clients ORDER BY name ASC');
+    return rows as Client[];
+    */
+    
+    // Returning mock data for now.
+    return Promise.resolve(clients);
+
+  } catch (error) {
+    console.error("Database Error (getClientsAction):", error);
+    // In a real app, you'd want more robust error handling
+    return [];
+  }
 }
 
+/**
+ * This function runs on the server and saves a new client to the database.
+ */
 export async function addClientAction(formData: FormData) {
     const rawData = Object.fromEntries(formData.entries());
     
-    // 1. VALIDATE DATA ON THE SERVER
+    // 1. Validate data on the server
     const validation = clientSchema.safeParse(rawData);
     if (!validation.success) {
         return { success: false, error: validation.error.flatten().fieldErrors };
@@ -38,10 +72,8 @@ export async function addClientAction(formData: FormData) {
 
     const { name, email, company, country } = validation.data;
     
-    // This is a temporary new client object. 
     // In a real scenario, the database would generate the ID.
-    const newClient: Client = {
-      id: (++lastId).toString(),
+    const newClientData = {
       name,
       email,
       company,
@@ -51,36 +83,31 @@ export async function addClientAction(formData: FormData) {
     };
 
     try {
-        // 2. INSERT DATA INTO YOUR MYSQL DATABASE
-        // This is where you would write your Node.js code to insert into MySQL.
-        // For example, using a library like 'mysql2/promise':
-        
+        // STEP 4: Replace mock logic with a database INSERT query
+        // This is where you write your Node.js code to insert into MySQL.
         /*
-        const connection = await getDbConnection(); // Your function to get a DB connection
-        const [result] = await connection.execute(
+        const [result] = await pool.execute(
             'INSERT INTO clients (name, email, company, country, totalSales, lastPurchaseDate) VALUES (?, ?, ?, ?, ?, ?)',
-            [newClient.name, newClient.email, newClient.company, newClient.country, newClient.totalSales, newClient.lastPurchaseDate]
+            [newClientData.name, newClientData.email, newClientData.company, newClientData.country, newClientData.totalSales, newClientData.lastPurchaseDate]
         );
         
-        // You might want to get the inserted ID and return the full client object
         const insertedId = (result as any).insertId;
-        newClient.id = insertedId.toString();
-        
+        const newClient: Client = { id: insertedId.toString(), ...newClientData };
+
         console.log(`Client added with ID: ${insertedId}`);
+        return { success: true, newClient };
         */
         
         // For this demonstration, we'll just add to our in-memory array.
+        // You can remove this block when you implement the database logic.
+        const newClient: Client = { id: (++lastId).toString(), ...newClientData };
         clients.push(newClient);
         console.log('Successfully added client to mock database:', newClient);
-
-
-        // 3. RETURN A SUCCESS RESPONSE
-        // It's good practice to return the created object to the client
-        // so the UI can be updated without needing another fetch.
         return { success: true, newClient };
 
+
     } catch (error) {
-        console.error("Database Error:", error);
+        console.error("Database Error (addClientAction):", error);
         return { success: false, error: "Failed to save client to the database." };
     }
 }

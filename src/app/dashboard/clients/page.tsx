@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { clients as initialClients } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -20,9 +19,13 @@ export default function ClientsPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    // In a real app, you'd fetch initial data here.
-    // For now, we'll keep using the mock data.
-    setClients(initialClients);
+    // This fetches the initial client data from your server when the page loads.
+    // The `getClientsAction` function is where you'd put your database select query.
+    async function loadClients() {
+      const initialClients = await getClientsAction();
+      setClients(initialClients);
+    }
+    loadClients();
   }, []);
 
 
@@ -30,11 +33,11 @@ export default function ClientsPage() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     
-    // The Server Action handles the backend logic
+    // The Server Action handles the backend logic, including database insertion.
     const result = await addClientAction(formData);
 
     if (result.success && result.newClient) {
-        // Optimistically update the UI
+        // Update the UI with the new client returned from the server.
         setClients(prevClients => [...prevClients, result.newClient!]);
         setDialogOpen(false);
         toast({
@@ -45,7 +48,7 @@ export default function ClientsPage() {
          toast({
             variant: "destructive",
             title: "Error",
-            description: result.error || "Could not add client.",
+            description: Array.isArray(result.error) ? result.error.join(', ') : (result.error as string || "Could not add client."),
         });
     }
   }
