@@ -1,4 +1,7 @@
 import type {NextConfig} from 'next';
+import { config } from 'dotenv';
+
+config();
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -23,7 +26,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https'
         hostname: 'picsum.photos',
         port: '',
         pathname: '/**',

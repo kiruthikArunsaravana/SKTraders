@@ -5,10 +5,10 @@ import { z } from 'zod';
 import mysql from 'mysql2/promise';
 
 const pool = mysql.createPool({
-  host: 'localhost', // Your MySQL host
-  user: 'root', // Your MySQL username
-  password: 'root', // Your MySQL password
-  database: 'sktraders', // Your MySQL database name
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'sktraders',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
