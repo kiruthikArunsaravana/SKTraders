@@ -342,8 +342,8 @@ export default function FinancePage() {
                   <DialogDescription>Describe the financial report you want to generate using AI.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
-                  <input type="hidden" name="dateRange.from" value={reportDateRange?.from?.toISOString() ?? ''} />
-                  <input type="hidden" name="dateRange.to" value={reportDateRange?.to?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRangeFrom" value={reportDateRange?.from?.toISOString() ?? ''} />
+                  <input type="hidden" name="dateRangeTo" value={reportDateRange?.to?.toISOString() ?? ''} />
                   
                   <div className="flex flex-col space-y-2">
                     <Label>Date Range</Label>

@@ -25,8 +25,8 @@ export async function handleGenerateFinanceReport(
   
   const rawFormData = {
     reportDescription: formData.get('reportDescription'),
-    dateRangeFrom: formData.get('dateRange.from'),
-    dateRangeTo: formData.get('dateRange.to'),
+    dateRangeFrom: formData.get('dateRangeFrom'),
+    dateRangeTo: formData.get('dateRangeTo'),
   };
 
   try {
