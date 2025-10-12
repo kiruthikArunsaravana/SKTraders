@@ -17,31 +17,27 @@ export function FirebaseClientProvider({
     const email = 'admin@example.com';
     const password = 'SecureP@ss123';
 
-    // This logic ensures the admin user exists and attempts to sign them in.
-    // It's non-blocking, and the actual auth state is managed by the onAuthStateChanged listener.
+    // This logic ensures the admin user exists for the first-time app setup.
+    // It runs only once on the client and does not block rendering.
     const ensureAdminUser = async () => {
       try {
-        // Attempt to create the user. This will fail if the user already exists.
+        // This will succeed only on the very first load if the user doesn't exist.
         await createUserWithEmailAndPassword(services.auth, email, password);
-        console.log("Admin user created and signed in automatically.");
+        console.log("Admin user created. You can now sign in.");
       } catch (error: any) {
-        // If the error code is 'auth/email-already-in-use', it means the user exists,
-        // which is expected on subsequent loads. We can then proceed to sign in.
-        if (error.code === 'auth/email-already-in-use') {
-          // Attempt to sign in, but don't block.
-          signInWithEmailAndPassword(services.auth, email, password).catch(signInError => {
-            // Silently handle potential sign-in errors during this auto-login phase.
-            // The user can still log in manually.
-             console.info('Auto-login attempt info:', (signInError as any).code);
-          });
-        } else {
-          // For other creation errors, log them for debugging.
-          console.error("Could not create admin user during initial setup:", error);
+        // 'auth/email-already-in-use' is the expected error on subsequent loads.
+        // We can safely ignore it. Other errors might indicate a problem.
+        if (error.code !== 'auth/email-already-in-use') {
+          console.error("Could not ensure admin user exists:", error);
         }
       }
     };
-
-    ensureAdminUser();
+    
+    // Only run this check if it hasn't been run before in this session.
+    if (typeof window !== 'undefined' && !(window as any).__adminUserChecked) {
+      ensureAdminUser();
+      (window as any).__adminUserChecked = true;
+    }
     
     return services;
   }, []);
