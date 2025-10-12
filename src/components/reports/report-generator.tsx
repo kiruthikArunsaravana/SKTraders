@@ -65,8 +65,6 @@ type PdfGenerationData = {
 export default function ReportGenerator() {
   const { toast } = useToast();
   const [isPending, setPending] = useState(false);
-  const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [pdfData, setPdfData] = useState<PdfGenerationData | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof reportSchema>>({
@@ -76,8 +74,12 @@ export default function ReportGenerator() {
     },
   });
 
-  const generatePdf = (data: PdfGenerationData) => {
-    const { title, dateRange, transactions, chartData: localChartData } = data;
+  const generatePdf = async (data: PdfGenerationData) => {
+    const { title, dateRange, transactions } = data;
+    
+    // Add a small delay to ensure the chart has rendered
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     const doc = new jsPDF();
 
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -114,7 +116,7 @@ export default function ReportGenerator() {
     doc.text('Performance by Product', 14, 100);
 
     const chartParent = chartContainerRef.current;
-    if (chartParent && localChartData.length > 0) {
+    if (chartParent) {
       const canvas = chartParent.querySelector('canvas');
       if (canvas) {
         try {
@@ -131,7 +133,7 @@ export default function ReportGenerator() {
       }
     }
     
-    const tableStartY = localChartData.length > 0 ? 195 : 105;
+    const tableStartY = 195;
 
     // Transactions Table
     const tableData = transactions.map(t => [
@@ -162,14 +164,6 @@ export default function ReportGenerator() {
     });
     setPending(false);
   };
-
-  useEffect(() => {
-    if (pdfData) {
-      generatePdf(pdfData);
-      setPdfData(null); // Clear the data after generation
-    }
-  }, [pdfData]);
-
 
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setPending(true);
@@ -204,8 +198,8 @@ export default function ReportGenerator() {
         expenses: productData[key].expenses,
       }));
 
-      setChartData(newChartData);
-      setPdfData({
+      // Directly call the async pdf generation function
+      await generatePdf({
         title: values.reportTitle,
         dateRange: values.dateRange,
         transactions,
@@ -226,21 +220,21 @@ export default function ReportGenerator() {
 
   return (
     <>
-    {/* Hidden chart for PDF generation */}
-    <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', height: '400px' }} ref={chartContainerRef}>
-        {chartData.length > 0 && (
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="income" fill="hsl(var(--chart-1))" name="Income" />
-                    <Bar dataKey="expenses" fill="hsl(var(--chart-2))" name="Expenses" />
-                </BarChart>
-            </ResponsiveContainer>
-        )}
+    {/* This container remains hidden and is used to render the chart for PDF capture */}
+    <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', height: '400px' }}>
+      <div ref={chartContainerRef} style={{width: '100%', height: '100%'}}>
+          <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={form.getValues('dateRange') ? [] : []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="income" fill="hsl(var(--chart-1))" name="Income" />
+                  <Bar dataKey="expenses" fill="hsl(var(--chart-2))" name="Expenses" />
+              </BarChart>
+          </ResponsiveContainer>
+      </div>
     </div>
 
     <Form {...form}>
