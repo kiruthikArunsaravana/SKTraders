@@ -53,8 +53,8 @@ export default function LoginPage() {
       });
       // The useEffect above will handle the redirect.
     } catch (signInError: any) {
-      if (signInError.code === 'auth/user-not-found') {
-        // If the user doesn't exist, try to create them.
+      if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+        // If the user doesn't exist or credential is wrong (which can happen on first run), try to create them.
         try {
           await createUserWithEmailAndPassword(auth, email, password);
           toast({
