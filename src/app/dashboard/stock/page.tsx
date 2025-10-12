@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Gem, Wind, Box } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { initialProducts } from '@/lib/data';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -34,45 +34,28 @@ export default function StockPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'products'), orderBy('name', 'asc'));
   }, [firestore]);
-  
-  // Effect to initialize products if the collection is empty
-  useEffect(() => {
-    if (!firestore) return;
-
-    const initializeProducts = async () => {
-        try {
-            await runTransaction(firestore, async (transaction) => {
-              for (const product of initialProducts) {
-                const productRef = doc(firestore, 'products', product.id);
-                const productDoc = await transaction.get(productRef);
-                if (!productDoc.exists()) {
-                  // Destructure to remove the 'icon' property before setting to Firestore
-                  const { icon, ...dbProduct } = product;
-                  transaction.set(productRef, dbProduct);
-                }
-              }
-            });
-        } catch (error) {
-             console.error("Failed to initialize products:", error);
-             toast({
-                variant: 'destructive',
-                title: 'Initialization Error',
-                description: 'Could not create initial product data.',
-             })
-        }
-    };
-    
-    initializeProducts();
-
-  }, [firestore, toast]);
 
   const { data: products, isLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
 
   const productsWithIcons = useMemo(() => {
-    return products?.map(p => ({
+    // Start with the static initialProducts to ensure the UI has something to show even before Firestore loads
+    const productMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
+
+    // Update with data from Firestore once it loads
+    if (products) {
+      products.forEach(dbProduct => {
+        const existingProduct = productMap.get(dbProduct.id);
+        if (existingProduct) {
+          productMap.set(dbProduct.id, { ...existingProduct, ...dbProduct });
+        }
+      });
+    }
+    
+    return Array.from(productMap.values()).map(p => ({
       ...p,
       icon: productIcons[p.id as keyof typeof productIcons] || Box
-    })) || [];
+    }));
+
   }, [products]);
 
 
@@ -87,29 +70,42 @@ export default function StockPage() {
     const productId = formData.get('product') as string;
     const quantity = parseInt(formData.get('quantity') as string, 10);
     
-    if (!productId || isNaN(quantity)) {
-        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a product and enter a valid quantity.' });
+    if (!productId || isNaN(quantity) || quantity <= 0) {
+        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a product and enter a positive quantity.' });
         return;
     }
     
     const productRef = doc(firestore, 'products', productId);
-
+    const staticProductData = initialProducts.find(p => p.id === productId);
+    if (!staticProductData) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Invalid product selected.' });
+        return;
+    }
+    
     try {
         await runTransaction(firestore, async (transaction) => {
             const productDoc = await transaction.get(productRef);
             if (!productDoc.exists()) {
-                throw new Error("Product document not found!");
+                // If doc doesn't exist, create it.
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { icon, ...dbProduct } = staticProductData;
+                transaction.set(productRef, {
+                    ...dbProduct,
+                    quantity: quantity,
+                });
+            } else {
+                // If doc exists, update the quantity.
+                const currentQuantity = productDoc.data().quantity || 0;
+                const newQuantity = currentQuantity + quantity;
+                transaction.update(productRef, { quantity: newQuantity });
             }
-            const currentQuantity = productDoc.data().quantity || 0;
-            const newQuantity = currentQuantity + quantity;
-            transaction.update(productRef, { quantity: newQuantity });
         });
 
         setDialogOpen(false);
         (event.target as HTMLFormElement).reset();
         toast({
           title: "Stock Added",
-          description: `${quantity} units have been added to ${productId}.`,
+          description: `${quantity} units have been added to ${staticProductData.name}.`,
         });
 
     } catch (error) {
