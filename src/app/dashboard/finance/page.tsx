@@ -12,8 +12,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { transactions as initialTransactions } from '@/lib/data';
-import type { Transaction } from '@/lib/types';
+import type { FinancialTransaction } from '@/lib/types';
 import { format, isToday, isThisMonth, startOfMonth, endOfMonth, eachDayOfInterval, compareAsc } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -37,28 +36,10 @@ const incomeProducts = [
   { id: 'other', name: 'Other' },
 ];
 
-type FinancialTransaction = {
-  id: string;
-  type: 'income' | 'expense';
-  amount: number;
-  description: string;
-  date: string;
-  category: string;
-};
-
 
 export default function FinancePage() {
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>(
-    initialTransactions.map(t => ({
-      id: t.id,
-      type: t.type.toLowerCase() as 'income' | 'expense',
-      amount: t.amount,
-      description: t.clientName,
-      date: t.date,
-      category: t.product,
-    }))
-  );
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState('income');
   const [entryDate, setEntryDate] = useState<Date | undefined>(new Date());

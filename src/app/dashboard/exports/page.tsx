@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { exports as initialExports } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -18,10 +17,11 @@ import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import type { Export } from '@/lib/types';
 
 export default function ExportsPage() {
   const { toast } = useToast();
-  const [exports, setExports] = useState(initialExports);
+  const [exports, setExports] = useState<Export[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
@@ -192,19 +192,27 @@ export default function ExportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExports.map((exp) => (
-                <TableRow key={exp.id}>
-                  <TableCell>
-                    <div className="font-medium">{exp.buyerName}</div>
+              {filteredExports.length > 0 ? (
+                filteredExports.map((exp) => (
+                  <TableRow key={exp.id}>
+                    <TableCell>
+                      <div className="font-medium">{exp.buyerName}</div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant="outline">{exp.country}</Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{exp.port}</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(new Date(exp.date), 'PP')}</TableCell>
+                    <TableCell className="text-right">${exp.value.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    No export orders to display.
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge variant="outline">{exp.country}</Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{exp.port}</TableCell>
-                  <TableCell className="hidden md:table-cell">{format(new Date(exp.date), 'PP')}</TableCell>
-                  <TableCell className="text-right">${exp.value.toLocaleString()}</TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>

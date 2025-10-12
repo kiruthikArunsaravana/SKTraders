@@ -13,10 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Gem, Wind, Box } from 'lucide-react';
+import type { Product } from '@/lib/types';
 
 export default function StockPage() {
   const { toast } = useToast();
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isDialogOpen, setDialogOpen] = useState(false);
 
   const productIcons = {
