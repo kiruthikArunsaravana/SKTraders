@@ -7,34 +7,47 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { clients as initialClients } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { addClientAction, getClientsAction } from './actions';
+import type { Client } from '@/lib/types';
 
 export default function ClientsPage() {
   const { toast } = useToast();
-  const [clients, setClients] = useState(initialClients);
+  const [clients, setClients] = useState<Client[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
 
-  function handleAddClient(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    // In a real app, you'd fetch initial data here.
+    // For now, we'll keep using the mock data.
+    setClients(initialClients);
+  }, []);
+
+
+  async function handleAddClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const newClient = {
-      id: (clients.length + 1).toString(),
-      name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      company: formData.get('company') as string,
-      country: formData.get('country') as string,
-      totalSales: 0,
-      lastPurchaseDate: new Date().toISOString().split('T')[0],
-    };
-    setClients([...clients, newClient]);
-    setDialogOpen(false);
-    toast({
-      title: "Client Added",
-      description: `${newClient.name} has been successfully added.`,
-    });
+    
+    // The Server Action handles the backend logic
+    const result = await addClientAction(formData);
+
+    if (result.success && result.newClient) {
+        // Optimistically update the UI
+        setClients(prevClients => [...prevClients, result.newClient!]);
+        setDialogOpen(false);
+        toast({
+          title: "Client Added",
+          description: `${result.newClient.name} has been successfully added.`,
+        });
+    } else {
+         toast({
+            variant: "destructive",
+            title: "Error",
+            description: result.error || "Could not add client.",
+        });
+    }
   }
 
   return (
