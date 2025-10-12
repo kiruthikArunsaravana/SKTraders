@@ -296,12 +296,6 @@
       ]
     }
   },
-  "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
-  },
   "firestore": {
     "structure": [
       {
