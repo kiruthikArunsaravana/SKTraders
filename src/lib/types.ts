@@ -29,6 +29,8 @@ export type FinancialTransaction = {
   category: string;
 };
 
+export type ExportStatus = 'To-do' | 'In Progress' | 'Completed';
+
 export type Export = {
   id: string;
   buyerName: string;
@@ -36,6 +38,7 @@ export type Export = {
   port: string;
   value: number;
   date: Timestamp;
+  status: ExportStatus;
 };
 
 export interface NavItem {

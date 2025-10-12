@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, Download, Calendar as CalendarIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,14 +17,19 @@ import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import type { Export } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import type { Export, ExportStatus } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, Timestamp, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const exportStatuses: ExportStatus[] = ['To-do', 'In Progress', 'Completed'];
 
 export default function ExportsPage() {
   const { toast } = useToast();
-  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedExport, setSelectedExport] = useState<Export | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const firestore = useFirestore();
@@ -43,7 +48,7 @@ export default function ExportsPage() {
     }
     const from = dateRange.from;
     const to = dateRange.to;
-    to.setHours(23, 59, 59, 999);
+to.setHours(23, 59, 59, 999);
 
     return exports.filter(exp => {
       const expDate = exp.date.toDate();
@@ -68,8 +73,9 @@ export default function ExportsPage() {
     const country = formData.get('country') as string;
     const port = formData.get('port') as string;
     const value = parseFloat(formData.get('value') as string);
+    const status = formData.get('status') as ExportStatus;
     
-    if (!buyerName || !country || !port || !value) {
+    if (!buyerName || !country || !port || !value || !status) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
@@ -81,17 +87,44 @@ export default function ExportsPage() {
       port,
       value,
       date: Timestamp.now(),
+      status,
     };
     
     addDocumentNonBlocking(exportsCollection, newExportData);
 
-    setDialogOpen(false);
+    setAddDialogOpen(false);
     (event.target as HTMLFormElement).reset();
     toast({
       title: "Export Order Added",
       description: `Order for ${buyerName} has been successfully added.`,
     });
   }
+
+  const handleEditStatus = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!firestore || !selectedExport) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not update status.' });
+        return;
+    }
+    const formData = new FormData(event.currentTarget);
+    const status = formData.get('status') as ExportStatus;
+
+    if (!status) {
+        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a status.' });
+        return;
+    }
+
+    const exportRef = doc(firestore, 'exports', selectedExport.id);
+    updateDocumentNonBlocking(exportRef, { status });
+
+    setEditDialogOpen(false);
+    setSelectedExport(null);
+    toast({
+        title: "Status Updated",
+        description: `Order for ${selectedExport.buyerName} is now "${status}".`,
+    });
+  };
+
   
   const handleGeneratePdf = () => {
     if (filteredExports.length === 0) {
@@ -122,12 +155,13 @@ export default function ExportsPage() {
       exp.country,
       exp.port,
       format(exp.date.toDate(), 'PP'),
+      exp.status,
       `$${exp.value.toLocaleString()}`
     ]);
 
     autoTable(doc, {
       startY: 45,
-      head: [['Buyer Name', 'Country', 'Port', 'Date', 'Value']],
+      head: [['Buyer Name', 'Country', 'Port', 'Date', 'Status', 'Value']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -146,6 +180,15 @@ export default function ExportsPage() {
     });
   };
 
+  const statusBadgeVariant = (status: ExportStatus) => {
+    switch (status) {
+        case 'Completed': return 'default';
+        case 'In Progress': return 'secondary';
+        case 'To-do': return 'destructive';
+        default: return 'outline';
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-2 flex-wrap">
@@ -162,7 +205,7 @@ export default function ExportsPage() {
                 <Calendar initialFocus mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
               </PopoverContent>
             </Popover>
-          <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add Order
@@ -188,6 +231,19 @@ export default function ExportsPage() {
                   <div className="space-y-2">
                     <Label htmlFor="port">Port</Label>
                     <Input id="port" name="port" placeholder="e.g., Hamburg" required />
+                  </div>
+                   <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select name="status" defaultValue="To-do" required>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {exportStatuses.map(status => (
+                                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="value">Value ($)</Label>
@@ -215,17 +271,18 @@ export default function ExportsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Buyer Name</TableHead>
-                <TableHead className="hidden md:table-cell">Country</TableHead>
-                <TableHead className="hidden md:table-cell">Port</TableHead>
+                <TableHead className="hidden sm:table-cell">Country</TableHead>
+                <TableHead className="hidden md:table-cell">Status</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
                 <TableHead className="text-right">Value</TableHead>
+                <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                   <>
-                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   </>
               )}
               {!isLoading && filteredExports.length > 0 ? (
@@ -233,18 +290,27 @@ export default function ExportsPage() {
                   <TableRow key={exp.id}>
                     <TableCell>
                       <div className="font-medium">{exp.buyerName}</div>
+                      <div className="hidden text-sm text-muted-foreground md:inline">
+                        {exp.port}
+                      </div>
                     </TableCell>
+                    <TableCell className="hidden sm:table-cell">{exp.country}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline">{exp.country}</Badge>
+                      <Badge variant={statusBadgeVariant(exp.status)}>{exp.status}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{exp.port}</TableCell>
                     <TableCell className="hidden md:table-cell">{format(exp.date.toDate(), 'PP')}</TableCell>
                     <TableCell className="text-right">${exp.value.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                       <Button variant="ghost" size="icon" onClick={() => { setSelectedExport(exp); setEditDialogOpen(true); }}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit Status</span>
+                        </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     No export orders to display.
                   </TableCell>
                 </TableRow>
@@ -253,6 +319,38 @@ export default function ExportsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Status Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Order Status</DialogTitle>
+            <DialogDescription>
+              Update the status for the order from {selectedExport?.buyerName}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditStatus}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select name="status" defaultValue={selectedExport?.status} required>
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {exportStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit">Update Status</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

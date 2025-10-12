@@ -283,6 +283,15 @@
         "invoiceNumber": {
           "type": "string",
           "description": "Invoice number for the export."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the export order.",
+          "enum": [
+            "To-do",
+            "In Progress",
+            "Completed"
+          ]
         }
       },
       "required": [
@@ -293,7 +302,8 @@
         "exportDate",
         "destinationCountry",
         "destinationPort",
-        "invoiceNumber"
+        "invoiceNumber",
+        "status"
       ]
     }
   },
