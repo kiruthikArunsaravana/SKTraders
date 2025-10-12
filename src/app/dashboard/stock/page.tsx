@@ -4,21 +4,39 @@ import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { products as initialProducts } from '@/lib/data';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Gem, Wind, Box } from 'lucide-react';
 import type { Product } from '@/lib/types';
+import { getProductsAction, updateStockAction } from './actions';
+import { initialProducts } from '@/lib/data';
+
 
 export default function StockPage() {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    async function loadProducts() {
+        const dbProducts = await getProductsAction();
+        // This maps the icon from the static initialProducts list to the products fetched from the db.
+        const productsWithIcons = dbProducts.map(dbProd => {
+            const initialProd = initialProducts.find(p => p.id === dbProd.id);
+            return {
+                ...dbProd,
+                icon: initialProd?.icon || Box, // Default to Box icon if not found
+            };
+        });
+        setProducts(productsWithIcons);
+    }
+    loadProducts();
+  }, []);
 
   const productIcons = {
     'coco-pith': Box,
@@ -26,21 +44,27 @@ export default function StockPage() {
     'husk-chips': Gem,
   };
 
-  function handleAddStock(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAddStock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const productId = formData.get('product') as 'coco-pith' | 'coir-fiber' | 'husk-chips';
-    const quantity = parseInt(formData.get('quantity') as string, 10);
+    const result = await updateStockAction(formData);
     
-    setProducts(products.map(p => 
-      p.id === productId ? { ...p, quantity: p.quantity + quantity } : p
-    ));
-    
-    setDialogOpen(false);
-    toast({
-      title: "Stock Added",
-      description: `${quantity} units of ${productId.replace('-', ' ')} have been added.`,
-    });
+    if (result.success && result.updatedProduct) {
+        setProducts(products.map(p => 
+          p.id === result.updatedProduct!.id ? { ...p, quantity: result.updatedProduct!.quantity } : p
+        ));
+        setDialogOpen(false);
+        toast({
+          title: "Stock Added",
+          description: `${formData.get('quantity')} units of ${result.updatedProduct.name} have been added.`,
+        });
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Error updating stock',
+            description: result.error || 'An unknown error occurred',
+        });
+    }
   }
 
   return (

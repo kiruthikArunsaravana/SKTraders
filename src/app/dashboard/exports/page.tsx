@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,12 +18,21 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Export } from '@/lib/types';
+import { addExportAction, getExportsAction } from './actions';
 
 export default function ExportsPage() {
   const { toast } = useToast();
   const [exports, setExports] = useState<Export[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
+  useEffect(() => {
+    async function loadExports() {
+      const initialExports = await getExportsAction();
+      setExports(initialExports);
+    }
+    loadExports();
+  }, []);
 
   const filteredExports = useMemo(() => {
     if (!dateRange || !dateRange.from || !dateRange.to) {
@@ -44,23 +53,25 @@ export default function ExportsPage() {
   }, [filteredExports]);
 
 
-  function handleAddExportOrder(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAddExportOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const newExport = {
-      id: (exports.length + 1).toString(),
-      buyerName: formData.get('buyerName') as string,
-      country: formData.get('country') as string,
-      port: formData.get('port') as string,
-      value: parseFloat(formData.get('value') as string),
-      date: new Date().toISOString().split('T')[0],
-    };
-    setExports([...exports, newExport].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    setDialogOpen(false);
-    toast({
-      title: "Export Order Added",
-      description: `Order for ${newExport.buyerName} has been successfully added.`,
-    });
+    const result = await addExportAction(formData);
+
+    if (result.success && result.newExport) {
+      setExports(prevExports => [...prevExports, result.newExport!].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setDialogOpen(false);
+      toast({
+        title: "Export Order Added",
+        description: `Order for ${result.newExport.buyerName} has been successfully added.`,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error adding export",
+        description: result.error || "An unknown error occurred.",
+      });
+    }
   }
   
   const handleGeneratePdf = () => {

@@ -1,11 +1,11 @@
 'use client';
 
-import { PlusCircle, Calendar as CalendarIcon, Filter, Download } from 'lucide-react';
+import { PlusCircle, Calendar as CalendarIcon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { FinancialTransaction } from '@/lib/types';
-import { format, isToday, isThisMonth, startOfMonth, endOfMonth, eachDayOfInterval, compareAsc } from 'date-fns';
+import { format, isToday, isThisMonth, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import type { DateRange } from 'react-day-picker';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { addTransactionAction, getTransactionsAction } from './actions';
 
 const expenseCategories = [
   { id: 'husk', name: 'Husk' },
@@ -51,31 +52,36 @@ export default function FinancePage() {
   });
   const [dateRange2, setDateRange2] = useState<DateRange | undefined>();
 
+  useEffect(() => {
+    async function loadTransactions() {
+      const initialTransactions = await getTransactionsAction();
+      setTransactions(initialTransactions);
+    }
+    loadTransactions();
+  }, []);
 
-  const handleAddEntry = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const type = formData.get('type') as 'income' | 'expense';
-    const amount = parseFloat(formData.get('amount') as string);
-    const description = formData.get('description') as string;
-    const category = (formData.get('category') || formData.get('product')) as string;
+    formData.set('date', entryDate ? format(entryDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
     
-    const newTransaction: FinancialTransaction = {
-      id: (transactions.length + 1).toString(),
-      type,
-      amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
-      description,
-      category,
-      date: entryDate?.toISOString() ?? new Date().toISOString(),
-    };
+    const result = await addTransactionAction(formData);
 
-    setTransactions([...transactions, newTransaction]);
-    setAddEntryDialogOpen(false);
-    setEntryDate(new Date()); // Reset date for next entry
-    toast({
-      title: "Entry Added",
-      description: `A new ${type} entry for $${Math.abs(amount)} has been recorded.`,
-    });
+    if (result.success && result.newTransaction) {
+      setTransactions(prev => [...prev, result.newTransaction!]);
+      setAddEntryDialogOpen(false);
+      setEntryDate(new Date()); // Reset date for next entry
+      toast({
+        title: "Entry Added",
+        description: `A new ${result.newTransaction.type} entry for $${Math.abs(result.newTransaction.amount)} has been recorded.`,
+      });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Error adding transaction",
+            description: result.error || "An unknown error occurred.",
+        });
+    }
   };
 
   const processTransactionsForRange = (range: DateRange | undefined) => {
@@ -249,6 +255,8 @@ export default function FinancePage() {
 
   const todaysIncome = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'income');
   const todaysExpenses = transactions.filter(t => isToday(new Date(t.date)) && t.type === 'expense');
+  const monthlySummary = processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) });
+
 
   return (
     <div className="space-y-6">
@@ -320,15 +328,15 @@ export default function FinancePage() {
             <CardContent className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-lg">Total Income</CardTitle></CardHeader>
-                    <CardContent><p className="text-3xl font-bold text-green-600">${(transactions.filter(t => isThisMonth(new Date(t.date)) && t.type === 'income').reduce((acc, t) => acc + t.amount, 0)).toLocaleString()}</p></CardContent>
+                    <CardContent><p className="text-3xl font-bold text-green-600">${(monthlySummary.totalIncome).toLocaleString()}</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-lg">Total Expenses</CardTitle></CardHeader>
-                    <CardContent><p className="text-3xl font-bold text-red-600">-${(Math.abs(transactions.filter(t => isThisMonth(new Date(t.date)) && t.type === 'expense').reduce((acc, t) => acc + t.amount, 0))).toLocaleString()}</p></CardContent>
+                    <CardContent><p className="text-3xl font-bold text-red-600">-${(monthlySummary.totalExpenses).toLocaleString()}</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-lg">Net Profit</CardTitle></CardHeader>
-                    <CardContent><p className="text-3xl font-bold">${(transactions.filter(t => isThisMonth(new Date(t.date))).reduce((acc, t) => acc + t.amount, 0)).toLocaleString()}</p></CardContent>
+                    <CardContent><p className="text-3xl font-bold">${(monthlySummary.netProfit).toLocaleString()}</p></CardContent>
                 </Card>
             </CardContent>
           </Card>

@@ -8,9 +8,22 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { salesByMonth } from '@/lib/data';
+import { getSalesByMonthAction } from '@/app/dashboard/actions';
+import { useEffect, useState } from 'react';
+
+type SalesByMonth = {
+    month: string;
+    sales: number;
+    expenses: number;
+};
 
 export default function SalesChart() {
+  const [salesData, setSalesData] = useState<SalesByMonth[]>([]);
+  
+  useEffect(() => {
+    getSalesByMonthAction().then(setSalesData);
+  }, []);
+
   return (
     <Card className="xl:col-span-2">
       <CardHeader>
@@ -19,7 +32,7 @@ export default function SalesChart() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={salesByMonth}>
+            <BarChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis 
                     dataKey="month" 
