@@ -3,16 +3,12 @@
  * @fileOverview A finance report generation AI flow.
  *
  * - generateReport - A function that handles the finance report generation.
- * - GenerateReportOutput - The return type for the generateReport function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { GenerateReportOutput, GenerateReportOutputSchema } from './report-schemas';
 
-export const GenerateReportOutputSchema = z.object({
-  report: z.string().describe('The formatted financial report.'),
-});
-export type GenerateReportOutput = z.infer<typeof GenerateReportOutputSchema>;
 
 export async function generateReport(
   contextString: string
