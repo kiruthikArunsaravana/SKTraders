@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, Wand2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -31,12 +31,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Textarea } from '@/components/ui/textarea';
-import { generateClientReport } from '@/app/dashboard/reports/actions';
+import { Input } from '@/components/ui/input';
+import { getTransactionsForDateRange } from '@/app/dashboard/reports/actions';
+import type { FinancialTransaction } from '@/lib/types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useToast } from '@/hooks/use-toast';
 
 const reportSchema = z.object({
-  reportDescription: z.string().min(10, {
-    message: 'Description must be at least 10 characters.',
+  reportTitle: z.string().min(5, {
+    message: 'Title must be at least 5 characters.',
   }),
   dateRange: z.object({
     from: z.date({ required_error: 'A start date is required.' }),
@@ -44,174 +48,197 @@ const reportSchema = z.object({
   }),
 });
 
-type ReportState = {
-  report: string | null;
-  error: string | null;
-  pending: boolean;
-};
-
 export default function ReportGenerator() {
-  const [state, setState] = useState<ReportState>({
-    report: null,
-    error: null,
-    pending: false,
-  });
+  const { toast } = useToast();
+  const [isPending, setPending] = useState(false);
 
   const form = useForm<z.infer<typeof reportSchema>>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
-      reportDescription: 'Provide a summary of sales and profits, highlighting the best performing product.',
+      reportTitle: 'Monthly Financial Summary',
     },
   });
 
   async function onSubmit(values: z.infer<typeof reportSchema>) {
-    setState({ report: null, error: null, pending: true });
-
+    setPending(true);
     try {
-      const report = await generateClientReport(
-        values.reportDescription,
-        values.dateRange
-      );
-      setState({ report, error: null, pending: false });
-    } catch (error: any) {
-      setState({ report: null, error: error.message, pending: false });
+      const transactions = await getTransactionsForDateRange(values.dateRange);
+      
+      if (transactions.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Data Found',
+          description: 'There are no transactions in the selected date range to generate a report.',
+        });
+        setPending(false);
+        return;
+      }
+      
+      generatePdf(values.reportTitle, values.dateRange, transactions);
+
+    } catch (error) {
+      console.error("Failed to generate report:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Generating Report',
+        description: 'An unexpected error occurred. Please try again.',
+      });
+    } finally {
+      setPending(false);
     }
   }
 
+  const generatePdf = (title: string, dateRange: { from: Date; to: Date }, transactions: FinancialTransaction[]) => {
+    const doc = new jsPDF();
+
+    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const netProfit = totalIncome + totalExpenses;
+
+    // Header
+    doc.setFont('Playfair Display', 'bold');
+    doc.setFontSize(22);
+    doc.text(title, 14, 22);
+    
+    doc.setFont('PT Sans', 'normal');
+    doc.setFontSize(11);
+    doc.text(`For SK Traders`, 14, 30);
+    doc.text(`Date Range: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`, 14, 36);
+    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 42);
+
+    // Summary
+    doc.setFontSize(16);
+    doc.setFont('Playfair Display', 'bold');
+    doc.text('Summary', 14, 60);
+
+    doc.setFont('PT Sans', 'normal');
+    doc.setFontSize(12);
+    doc.text(`Total Income: $${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, 70);
+    doc.text(`Total Expenses: $${Math.abs(totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, 76);
+    
+    doc.setFont('PT Sans', 'bold');
+    doc.text(`Net Profit / Loss: $${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, 84);
+    
+
+    // Transactions Table
+    const tableData = transactions.map(t => [
+      format(new Date(t.date), 'yyyy-MM-dd'),
+      t.description,
+      t.category,
+      t.type.charAt(0).toUpperCase() + t.type.slice(1),
+      `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ]);
+
+    autoTable(doc, {
+      startY: 95,
+      head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [40, 50, 80] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 10;
+    doc.setFontSize(10);
+    doc.text(`--- End of Report ---`, 14, finalY + 10);
+
+
+    doc.save(`${title.replace(/ /g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast({
+      title: "PDF Report Generated",
+      description: "Your report has been successfully downloaded.",
+    });
+  };
+
   return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Generate AI-Powered Analysis</CardTitle>
-              <CardDescription>
-                Describe the analysis you want to generate and select a date range.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <FormField
-                control={form.control}
-                name="dateRange"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date range</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={'outline'}
-                            className={cn(
-                              'w-full justify-start text-left font-normal md:w-1/2',
-                              !field.value?.from && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value?.from ? (
-                              field.value.to ? (
-                                <>
-                                  {format(field.value.from, 'LLL dd, y')} -{' '}
-                                  {format(field.value.to, 'LLL dd, y')}
-                                </>
-                              ) : (
-                                format(field.value.from, 'LLL dd, y')
-                              )
-                            ) : (
-                              <span>Pick a date range</span>
-                            )}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="range"
-                          selected={{ from: field.value?.from, to: field.value?.to }}
-                          onSelect={field.onChange}
-                          numberOfMonths={2}
-                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="reportDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What do you want to analyze?</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g., Compare sales, expenses, and profits..."
-                        className="resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      This will be sent to an AI to generate the report. Be as specific as you like.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={state.pending}>
-                {state.pending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Wand2 className="mr-2 h-4 w-4" />
-                )}
-                Generate Report
-              </Button>
-            </CardFooter>
-          </Card>
-        </form>
-      </Form>
-      
-      {state.pending && (
-        <Card className="mt-6">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Card>
           <CardHeader>
-            <CardTitle>Generating Report...</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p>The AI is analyzing the data. This might take a moment.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {state.error && (
-        <Card className="mt-6 border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>{state.error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {state.report && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Generated Report</CardTitle>
+            <CardTitle>Generate Financial Report</CardTitle>
             <CardDescription>
-              The following report was generated by AI based on your query.
+              Select a date range and provide a title for your PDF report.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap font-body text-sm bg-muted p-4 rounded-lg">
-              {state.report}
-            </pre>
+          <CardContent className="space-y-6">
+            <FormField
+              control={form.control}
+              name="dateRange"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Date range</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={'outline'}
+                          className={cn(
+                            'w-full justify-start text-left font-normal md:w-1/2',
+                            !field.value?.from && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {field.value?.from ? (
+                            field.value.to ? (
+                              <>
+                                {format(field.value.from, 'LLL dd, y')} -{' '}
+                                {format(field.value.to, 'LLL dd, y')}
+                              </>
+                            ) : (
+                              format(field.value.from, 'LLL dd, y')
+                            )
+                          ) : (
+                            <span>Pick a date range</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={{ from: field.value?.from, to: field.value?.to }}
+                        onSelect={field.onChange}
+                        numberOfMonths={2}
+                        disabled={(date) => date > new Date() || date < new Date("2000-01-01")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="reportTitle"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Report Title</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., Q4 Financial Summary"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    This will be the title of the generated PDF document.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Generate PDF
+            </Button>
+          </CardFooter>
         </Card>
-      )}
-    </>
+      </form>
+    </Form>
   );
 }

@@ -29,6 +29,15 @@ export type Transaction = {
   type: 'Income' | 'Expense';
 };
 
+export type FinancialTransaction = {
+  id: string;
+  type: 'income' | 'expense';
+  amount: number;
+  description: string;
+  date: string;
+  category: string;
+};
+
 export type Export = {
   id: string;
   buyerName: string;
