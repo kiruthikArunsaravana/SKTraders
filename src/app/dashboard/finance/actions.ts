@@ -1,17 +1,15 @@
-
 'use server';
 
 import { z } from 'zod';
 import { generateReport } from '@/ai/flows/generate-report';
 import { format } from 'date-fns';
-import { transactions } from '@/lib/data';
+import { transactions as allTransactions } from '@/lib/data';
 
 const reportSchema = z.object({
-  reportDescription: z.string().min(1),
-  dateRangeFrom: z.string().min(1),
-  dateRangeTo: z.string().min(1),
+  reportDescription: z.string().min(1, 'Report description is required.'),
+  dateRangeFrom: z.string().min(1, 'Start date is required.'),
+  dateRangeTo: z.string().min(1, 'End date is required.'),
 });
-
 
 type ReportState = {
   report: string | null;
@@ -22,20 +20,28 @@ export async function handleGenerateFinanceReport(
   prevState: ReportState,
   formData: FormData
 ): Promise<ReportState> {
-  
   const rawFormData = {
     reportDescription: formData.get('reportDescription'),
     dateRangeFrom: formData.get('dateRangeFrom'),
     dateRangeTo: formData.get('dateRangeTo'),
   };
 
+  const validationResult = reportSchema.safeParse(rawFormData);
+
+  if (!validationResult.success) {
+    return {
+      report: null,
+      error: validationResult.error.errors.map((e) => e.message).join(', '),
+    };
+  }
+  
+  const { reportDescription, dateRangeFrom, dateRangeTo } = validationResult.data;
+
   try {
-    const validatedFields = reportSchema.parse(rawFormData);
+    const fromDate = new Date(dateRangeFrom);
+    const toDate = new Date(dateRangeTo);
     
-    const fromDate = new Date(validatedFields.dateRangeFrom);
-    const toDate = new Date(validatedFields.dateRangeTo);
-    
-    const transactionsInRange = transactions.filter(t => {
+    const transactionsInRange = allTransactions.filter(t => {
         const transactionDate = new Date(t.date);
         return transactionDate >= fromDate && transactionDate <= toDate;
     });
@@ -48,7 +54,7 @@ export async function handleGenerateFinanceReport(
     }
 
     const input = {
-        reportDescription: validatedFields.reportDescription,
+        reportDescription: reportDescription,
         fromDate: format(fromDate, 'yyyy-MM-dd'),
         toDate: format(toDate, 'yyyy-MM-dd'),
         transactions: transactionsInRange.map(t => ({
@@ -73,9 +79,6 @@ export async function handleGenerateFinanceReport(
     return { report: result.report, error: null };
   } catch (error) {
     console.error('Error generating report:', error);
-    if (error instanceof z.ZodError) {
-        return { report: null, error: "Validation failed: " + error.errors.map(e => e.message).join(', ') };
-    }
     return {
       report: null,
       error: 'An unexpected error occurred while generating the report. Please check the inputs and try again.',
