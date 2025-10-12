@@ -14,6 +14,28 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+async function initializeClientsTable() {
+    const connection = await pool.getConnection();
+    try {
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS clients (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                company VARCHAR(255) NOT NULL,
+                country VARCHAR(255) NOT NULL,
+                totalSales DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+                lastPurchaseDate DATE NOT NULL
+            );
+        `);
+        console.log("'clients' table is ready.");
+    } catch (error) {
+        console.error("Error initializing clients table:", error);
+    } finally {
+        connection.release();
+    }
+}
+
 
 // Schema for validating form data remains the same
 const clientSchema = z.object({
@@ -31,9 +53,14 @@ export async function getClientsAction(): Promise<Client[]> {
     const [rows] = await pool.query('SELECT * FROM clients ORDER BY name ASC');
     return rows as Client[];
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+        console.log("Clients table not found, initializing it...");
+        await initializeClientsTable();
+        // Return empty array for the first load
+        return [];
+    }
     console.error("Database Error (getClientsAction):", error);
-    // In a real app, you'd want more robust error handling
     return [];
   }
 }
@@ -52,7 +79,6 @@ export async function addClientAction(formData: FormData) {
 
     const { name, email, company, country } = validation.data;
     
-    // In a real scenario, the database would generate the ID.
     const newClientData = {
       name,
       email,
@@ -74,7 +100,19 @@ export async function addClientAction(formData: FormData) {
         console.log(`Client added with ID: ${insertedId}`);
         return { success: true, newClient };
 
-    } catch (error) {
+    } catch (error: any) {
+         if (error.code === 'ER_NO_SUCH_TABLE') {
+            console.log("Clients table not found on add, initializing it...");
+            await initializeClientsTable();
+            // Retry the insertion
+             const [result] = await pool.execute(
+                'INSERT INTO clients (name, email, company, country, totalSales, lastPurchaseDate) VALUES (?, ?, ?, ?, ?, ?)',
+                [newClientData.name, newClientData.email, newClientData.company, newClientData.country, newClientData.totalSales, newClientData.lastPurchaseDate]
+            );
+            const insertedId = (result as any).insertId;
+            const newClient: Client = { id: insertedId.toString(), ...newClientData };
+            return { success: true, newClient };
+        }
         console.error("Database Error (addClientAction):", error);
         return { success: false, error: "Failed to save client to the database." };
     }
