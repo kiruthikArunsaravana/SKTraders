@@ -4,26 +4,26 @@ import { DollarSign, Receipt, TrendingUp, Ship } from 'lucide-react';
 const kpiData = [
   {
     title: 'Total Revenue',
-    value: '$45,231.89',
-    change: '+20.1% from last month',
+    value: '$0.00',
+    change: 'No data yet',
     icon: DollarSign,
   },
   {
     title: 'Total Expenses',
-    value: '$12,873.45',
-    change: '+18.1% from last month',
+    value: '$0.00',
+    change: 'No data yet',
     icon: Receipt,
   },
   {
     title: 'Top Product',
-    value: 'Coir Fiber',
-    change: '5,231 units sold',
+    value: 'N/A',
+    change: '0 units sold',
     icon: TrendingUp,
   },
   {
     title: 'Export Volume',
-    value: '234 Tons',
-    change: '+19% from last month',
+    value: '0 Tons',
+    change: 'No data yet',
     icon: Ship,
   },
 ];
