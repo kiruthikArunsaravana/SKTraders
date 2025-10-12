@@ -196,9 +196,14 @@ export default function ReportGenerator() {
             return;
         }
 
+        const formattedTransactions = transactions.map(t => ({
+          ...t,
+          date: format(t.date.toDate(), 'yyyy-MM-dd'),
+        }));
+
         const contextString = `
             Report Request: ${values.analysisRequest}
-            Transactions: ${JSON.stringify(transactions.map(t => ({...t, date: t.date.toDate()})), null, 2)}
+            Transactions: ${JSON.stringify(formattedTransactions, null, 2)}
         `;
 
         const result = await generateReport(contextString);
@@ -377,5 +382,3 @@ export default function ReportGenerator() {
     </div>
   );
 }
-
-    
