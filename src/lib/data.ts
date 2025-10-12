@@ -1,7 +1,7 @@
 import { Box, Wind, Mountain, Gem } from 'lucide-react';
 import type { Client, Product, Transaction, Export } from './types';
 import { placeholderImages } from './placeholder-images.json';
-import { format } from 'date-fns';
+import { format, subDays, startOfMonth } from 'date-fns';
 
 export const clients: Client[] = [
   { id: '1', name: 'Ramesh Kumar', company: 'Green Earth Exports', email: 'ramesh@greenearth.com', totalSales: 75000, lastPurchaseDate: '2023-10-15', country: 'India' },
@@ -23,8 +23,23 @@ const avatar4 = placeholderImages.find(p => p.id === 'avatar-4')?.imageUrl ?? ''
 
 const now = new Date();
 const currentYear = now.getFullYear();
+const currentMonth = now.getMonth();
+const startOfCurrentMonth = startOfMonth(now);
 
-export const transactions: Transaction[] = [];
+export const transactions: Transaction[] = [
+  { id: '1', clientName: 'Green Earth Exports', clientAvatarUrl: avatar1, product: 'Coco Pith', amount: 2500, date: subDays(now, 15).toISOString(), type: 'Income' },
+  { id: '2', clientName: 'Raw Materials Inc.', clientAvatarUrl: avatar3, product: 'Coco Pith', amount: -800, date: subDays(now, 14).toISOString(), type: 'Expense' },
+  { id: '3', clientName: 'Nusantara Gardens', clientAvatarUrl: avatar2, product: 'Coir Fiber', amount: 4200, date: subDays(now, 10).toISOString(), type: 'Income' },
+  { id: '4', clientName: 'Machine Maintenance', clientAvatarUrl: avatar4, product: 'Coir Fiber', amount: -1200, date: subDays(now, 8).toISOString(), type: 'Expense' },
+  { id: '5', clientName: 'Global Organics LLC', clientAvatarUrl: avatar3, product: 'Husk Chips', amount: 3100, date: subDays(now, 5).toISOString(), type: 'Income' },
+  { id: '6', clientName: 'Dragon Soil Inc.', clientAvatarUrl: avatar4, product: 'Coco Pith', amount: 1800, date: subDays(now, 2).toISOString(), type: 'Income' },
+  { id: '7', clientName: 'Fuel & Logistics', clientAvatarUrl: avatar1, product: 'Husk Chips', amount: -650, date: subDays(now, 1).toISOString(), type: 'Expense' },
+  // Previous month's data for comparison
+  { id: '8', clientName: 'Green Earth Exports', clientAvatarUrl: avatar1, product: 'Coir Fiber', amount: 3200, date: subDays(startOfCurrentMonth, 12).toISOString(), type: 'Income' },
+  { id: '9', clientName: 'Nusantara Gardens', clientAvatarUrl: avatar2, product: 'Husk Chips', amount: 2800, date: subDays(startOfCurrentMonth, 8).toISOString(), type: 'Income' },
+  { id: '10', clientName: 'Old Raw Materials', clientAvatarUrl: avatar3, product: 'Coco Pith', amount: -950, date: subDays(startOfCurrentMonth, 5).toISOString(), type: 'Expense' },
+];
+
 
 export const exports: Export[] = [
     { id: '1', buyerName: 'Euro Garden Supplies', country: 'Germany', port: 'Hamburg', value: 45000, date: new Date(currentYear, now.getMonth() - 1, 5).toISOString() },
