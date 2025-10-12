@@ -22,16 +22,16 @@ const prompt = ai.definePrompt({
   output: { schema: GenerateReportOutputSchema },
   prompt: `
     You are a financial analyst for a company named SK Traders that deals in coconut husk products.
-    Your task is to generate a concise and insightful financial report based on the provided data and a user's request.
+    Your task is to generate a concise and insightful financial report based on the provided data context.
 
-    Here is the data and the user's request:
+    Here is the data context:
     ---
     {{{input}}}
     ---
 
-    Analyze the provided data to fulfill the user's request. 
+    Analyze the provided data to fulfill the user's report request. 
     The report should be well-structured, easy to read, and directly address the user's query.
-    Start with a summary of the key findings, and then provide supporting details.
+    Start with a summary of the key findings, and then provide supporting details and analysis.
     
     Do not just list the data. Provide insights and analysis.
     The final output should be a single block of text, formatted for readability in a plain text or markdown-style.

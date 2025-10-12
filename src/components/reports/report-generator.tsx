@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, parseISO, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -33,13 +33,12 @@ import {
 } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { generateClientReport } from '@/app/dashboard/reports/actions';
-import { transactions as allTransactions } from '@/lib/data'; // We'll use this as our 'live' data source for now
 
 const reportSchema = z.object({
   reportDescription: z.string().min(10, {
     message: 'Description must be at least 10 characters.',
   }),
-  dateRange1: z.object({
+  dateRange: z.object({
     from: z.date({ required_error: 'A start date is required.' }),
     to: z.date({ required_error: 'An end date is required.' }),
   }),
@@ -68,42 +67,11 @@ export default function ReportGenerator() {
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setState({ report: null, error: null, pending: true });
 
-    const fromDate = values.dateRange1.from;
-    const toDate = values.dateRange1.to;
-    toDate.setHours(23, 59, 59, 999);
-
-    const filteredTransactions = allTransactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      return isWithinInterval(transactionDate, { start: fromDate, end: toDate });
-    });
-
-    if (filteredTransactions.length === 0) {
-      setState({
-        report: null,
-        pending: false,
-        error: "No transaction data found for the selected date range. Please select a different period or add some transactions.",
-      });
-      return;
-    }
-
-    const totalIncome = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0);
-    const totalExpenses = Math.abs(filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0));
-
-    const contextString = `
-      Report Request: ${values.reportDescription}
-      Date Range: ${format(fromDate, 'PPP')} to ${format(toDate, 'PPP')}
-      Total Income: $${totalIncome.toLocaleString()}
-      Total Expenses: $${totalExpenses.toLocaleString()}
-      Net Profit: $${(totalIncome - totalExpenses).toLocaleString()}
-      
-      Transactions:
-      ${filteredTransactions.map(t =>
-        `- ${format(new Date(t.date), 'yyyy-MM-dd')}: ${t.type} of $${Math.abs(t.amount)} for '${t.product}' related to '${t.clientName}'`
-      ).join('\n')}
-    `;
-
     try {
-      const report = await generateClientReport(contextString);
+      const report = await generateClientReport(
+        values.reportDescription,
+        values.dateRange
+      );
       setState({ report, error: null, pending: false });
     } catch (error: any) {
       setState({ report: null, error: error.message, pending: false });
@@ -124,7 +92,7 @@ export default function ReportGenerator() {
             <CardContent className="space-y-6">
               <FormField
                 control={form.control}
-                name="dateRange1"
+                name="dateRange"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Date range</FormLabel>
