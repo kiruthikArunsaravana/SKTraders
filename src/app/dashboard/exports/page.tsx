@@ -31,6 +31,7 @@ export default function ExportsPage() {
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedExport, setSelectedExport] = useState<Export | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [statusFilter, setStatusFilter] = useState<ExportStatus | 'all'>('all');
 
   const firestore = useFirestore();
 
@@ -43,18 +44,24 @@ export default function ExportsPage() {
 
   const filteredExports = useMemo(() => {
     if (!exports) return [];
-    if (!dateRange || !dateRange.from || !dateRange.to) {
-      return exports;
-    }
-    const from = dateRange.from;
-    const to = dateRange.to;
-to.setHours(23, 59, 59, 999);
-
+    
     return exports.filter(exp => {
-      const expDate = exp.date.toDate();
-      return isWithinInterval(expDate, { start: from, end: to });
+      // Date range filter
+      const isInDateRange = (() => {
+        if (!dateRange?.from || !dateRange?.to) return true; // No date range selected, include all
+        const from = dateRange.from;
+        const to = new Date(dateRange.to); // Clone to avoid mutation
+        to.setHours(23, 59, 59, 999);
+        const expDate = exp.date.toDate();
+        return isWithinInterval(expDate, { start: from, end: to });
+      })();
+
+      // Status filter
+      const hasStatus = statusFilter === 'all' || exp.status === statusFilter;
+      
+      return isInDateRange && hasStatus;
     });
-  }, [exports, dateRange]);
+  }, [exports, dateRange, statusFilter]);
 
   const totalValue = useMemo(() => {
     return filteredExports.reduce((acc, exp) => acc + exp.value, 0);
@@ -131,7 +138,7 @@ to.setHours(23, 59, 59, 999);
         toast({
             variant: "destructive",
             title: "No Data",
-            description: "There are no export orders in the selected date range to generate a report.",
+            description: "There are no export orders matching your current filters.",
         });
         return;
     }
@@ -144,11 +151,14 @@ to.setHours(23, 59, 59, 999);
     doc.setFontSize(12);
     doc.text(`For SK Traders`, 14, 30);
     
-    let reportDateText = `Generated on: ${format(new Date(), 'PPP')}`;
+    let filterDescription = `Status: ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`;
     if (dateRange?.from && dateRange.to) {
-        reportDateText = `Period: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`;
+        filterDescription += ` | Period: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`;
+    } else {
+        filterDescription += ' | Period: All Time';
     }
-    doc.text(reportDateText, 14, 36);
+    doc.setFontSize(10);
+    doc.text(filterDescription, 14, 36);
 
     const tableData = filteredExports.map((exp) => [
       exp.buyerName,
@@ -193,78 +203,93 @@ to.setHours(23, 59, 59, 999);
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-2 flex-wrap">
         <h1 className="text-3xl font-headline">Export Management</h1>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap justify-end">
            <Popover>
               <PopoverTrigger asChild>
                 <Button variant={'outline'} className={cn('w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}</> : format(dateRange.from, 'LLL dd, y')) : <span>Pick a date range</span>}
+                  {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}</> : format(dateRange.from, 'LLL dd, y')) : <span>Filter by date...</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar initialFocus mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
               </PopoverContent>
             </Popover>
-          <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-5 w-5" /> Add Order
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Export Order</DialogTitle>
-                <DialogDescription>
-                  Enter the details of the new export order.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddExportOrder}>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="buyerName">Buyer Name</Label>
-                    <Input id="buyerName" name="buyerName" placeholder="e.g., Euro Garden Supplies" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input id="country" name="country" placeholder="e.g., Germany" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="port">Port</Label>
-                    <Input id="port" name="port" placeholder="e.g., Hamburg" required />
-                  </div>
-                   <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select name="status" defaultValue="To-do" required>
-                          <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {exportStatuses.map(status => (
-                                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="value">Value ($)</Label>
-                    <Input id="value" name="value" type="number" placeholder="45000" required />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Add Order</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline" onClick={handleGeneratePdf}>
-            <Download className="mr-2 h-5 w-5" /> Download PDF
-          </Button>
+             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ExportStatus | 'all')}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {exportStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
         </div>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>International Buyers</CardTitle>
-          <CardDescription>Record and manage your export orders.</CardDescription>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>International Buyers</CardTitle>
+            <CardDescription>Record and manage your export orders.</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusCircle className="mr-2 h-5 w-5" /> Add Order
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Export Order</DialogTitle>
+                  <DialogDescription>
+                    Enter the details of the new export order.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddExportOrder}>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="buyerName">Buyer Name</Label>
+                      <Input id="buyerName" name="buyerName" placeholder="e.g., Euro Garden Supplies" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input id="country" name="country" placeholder="e.g., Germany" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="port">Port</Label>
+                      <Input id="port" name="port" placeholder="e.g., Hamburg" required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select name="status" defaultValue="To-do" required>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {exportStatuses.map(status => (
+                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="value">Value ($)</Label>
+                      <Input id="value" name="value" type="number" placeholder="45000" required />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit">Add Order</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" onClick={handleGeneratePdf}>
+              <Download className="mr-2 h-5 w-5" /> Download PDF
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -311,7 +336,7 @@ to.setHours(23, 59, 59, 999);
               ) : !isLoading && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center">
-                    No export orders to display.
+                    No export orders match your filters.
                   </TableCell>
                 </TableRow>
               )}
@@ -354,3 +379,5 @@ to.setHours(23, 59, 59, 999);
     </div>
   );
 }
+
+    
