@@ -38,21 +38,33 @@ export default function StockPage() {
   // Effect to initialize products if the collection is empty
   useEffect(() => {
     if (!firestore) return;
-    const productsCollectionRef = collection(firestore, 'products');
 
-    runTransaction(firestore, async (transaction) => {
-      for (const product of initialProducts) {
-        const productRef = doc(firestore, 'products', product.id);
-        const productDoc = await transaction.get(productRef);
-        if (!productDoc.exists()) {
-          const { icon, ...dbProduct } = product;
-          transaction.set(productRef, dbProduct);
+    const initializeProducts = async () => {
+        try {
+            await runTransaction(firestore, async (transaction) => {
+              for (const product of initialProducts) {
+                const productRef = doc(firestore, 'products', product.id);
+                const productDoc = await transaction.get(productRef);
+                if (!productDoc.exists()) {
+                  // Destructure to remove the 'icon' property before setting to Firestore
+                  const { icon, ...dbProduct } = product;
+                  transaction.set(productRef, dbProduct);
+                }
+              }
+            });
+        } catch (error) {
+             console.error("Failed to initialize products:", error);
+             toast({
+                variant: 'destructive',
+                title: 'Initialization Error',
+                description: 'Could not create initial product data.',
+             })
         }
-      }
-    }).catch(error => {
-        console.error("Failed to initialize products:", error);
-    });
-  }, [firestore]);
+    };
+    
+    initializeProducts();
+
+  }, [firestore, toast]);
 
   const { data: products, isLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
 
