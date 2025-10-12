@@ -1,10 +1,8 @@
 'use server';
 
-import { collection, doc, getDocs, runTransaction, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, runTransaction } from 'firebase/firestore';
 import { z } from 'zod';
-import { getSdks } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { getAdminSdks } from '@/firebase/server';
 import type { Product } from '@/lib/types';
 import { initialProducts } from '@/lib/data';
 
@@ -14,7 +12,7 @@ const stockSchema = z.object({
 });
 
 async function initializeProducts(): Promise<void> {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const productsCollection = collection(firestore, 'products');
 
   try {
@@ -37,7 +35,7 @@ async function initializeProducts(): Promise<void> {
 }
 
 export async function getProductsAction(): Promise<Omit<Product, 'icon'>[]> {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const productsCollection = collection(firestore, 'products');
   
   try {
@@ -58,18 +56,13 @@ export async function getProductsAction(): Promise<Omit<Product, 'icon'>[]> {
     return products;
   } catch (error) {
     console.error('Firestore Error (getProductsAction):', error);
-     const permissionError = new FirestorePermissionError({
-      path: 'products',
-      operation: 'list',
-    });
-    errorEmitter.emit('permission-error', permissionError);
     return [];
   }
 }
 
 
 export async function updateStockAction(formData: FormData) {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const rawData = Object.fromEntries(formData.entries());
 
   const validation = stockSchema.safeParse(rawData);
@@ -96,12 +89,6 @@ export async function updateStockAction(formData: FormData) {
 
   } catch (error) {
     console.error('Firestore Error (updateStockAction):', error);
-    const permissionError = new FirestorePermissionError({
-      path: `products/${productId}`,
-      operation: 'update',
-      requestResourceData: { quantity: `increment(${quantity})` }
-    });
-    errorEmitter.emit('permission-error', permissionError);
     return { success: false, error: 'Failed to update stock in the database.' };
   }
 }

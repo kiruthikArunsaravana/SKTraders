@@ -2,10 +2,9 @@
 
 import type { Export } from '@/lib/types';
 import { z } from 'zod';
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
-import { getSdks } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { addDoc, collection } from 'firebase/firestore';
+import { getAdminSdks } from '@/firebase/server';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const exportSchema = z.object({
   buyerName: z.string().min(1, 'Buyer name is required'),
@@ -15,7 +14,7 @@ const exportSchema = z.object({
 });
 
 export async function addExportAction(formData: FormData) {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const rawData = Object.fromEntries(formData.entries());
 
   const validation = exportSchema.safeParse(rawData);
@@ -42,12 +41,6 @@ export async function addExportAction(formData: FormData) {
     return { success: true, newExport };
   } catch (error) {
     console.error('Firestore Error (addExportAction):', error);
-    const permissionError = new FirestorePermissionError({
-      path: 'exports',
-      operation: 'create',
-      requestResourceData: newExportData,
-    });
-    errorEmitter.emit('permission-error', permissionError);
     return {
       success: false,
       error: 'Failed to save export order to the database.',

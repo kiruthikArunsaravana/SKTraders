@@ -1,11 +1,11 @@
 'use server';
 
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore';
 import { z } from 'zod';
-import { getSdks } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { getAdminSdks } from '@/firebase/server';
 import type { FinancialTransaction } from '@/lib/types';
+import { Timestamp } from 'firebase-admin/firestore';
+
 
 const transactionSchema = z.object({
   type: z.enum(['income', 'expense']),
@@ -16,7 +16,7 @@ const transactionSchema = z.object({
 });
 
 export async function addTransactionAction(formData: FormData) {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const rawData = {
     type: formData.get('type'),
     amount: formData.get('amount'),
@@ -56,12 +56,6 @@ export async function addTransactionAction(formData: FormData) {
     return { success: true, newTransaction };
   } catch (error) {
     console.error('Firestore Error (addTransactionAction):', error);
-    const permissionError = new FirestorePermissionError({
-      path: 'financial_transactions',
-      operation: 'create',
-      requestResourceData: newTransactionData,
-    });
-    errorEmitter.emit('permission-error', permissionError);
     return {
       success: false,
       error: 'Failed to save transaction to the database.',

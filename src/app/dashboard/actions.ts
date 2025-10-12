@@ -7,11 +7,11 @@ import {
   getDocs,
   limit,
   orderBy,
-  Timestamp,
 } from 'firebase/firestore';
-import { getSdks } from '@/firebase';
+import { getAdminSdks } from '@/firebase/server';
 import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import type { FinancialTransaction, Export } from '@/lib/types';
+import { Timestamp } from 'firebase-admin/firestore';
 
 type KpiData = {
   totalRevenue: number;
@@ -42,7 +42,7 @@ async function getFinancialsForPeriod(
   startDate: Date,
   endDate: Date
 ): Promise<{ revenue: number; expenses: number }> {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const transactionsRef = collection(firestore, 'financial_transactions');
 
   const incomeQuery = query(
@@ -77,7 +77,7 @@ async function getFinancialsForPeriod(
 
 export async function getDashboardKpiData(): Promise<KpiData> {
   try {
-    const { firestore } = getSdks();
+    const { firestore } = getAdminSdks();
     const now = new Date();
     const thisMonthStart = startOfMonth(now);
     const thisMonthEnd = endOfMonth(now);
@@ -167,7 +167,7 @@ export async function getDashboardKpiData(): Promise<KpiData> {
 
 export async function getRecentTransactionsAction(): Promise<RecentTransaction[]> {
   try {
-    const { firestore } = getSdks();
+    const { firestore } = getAdminSdks();
     const transactionsRef = collection(firestore, 'financial_transactions');
     const q = query(transactionsRef, orderBy('date', 'desc'), limit(5));
     const querySnapshot = await getDocs(q);
@@ -211,7 +211,7 @@ export async function getSalesByMonthAction(): Promise<SalesByMonth[]> {
   }));
 
   try {
-    const { firestore } = getSdks();
+    const { firestore } = getAdminSdks();
     const oneYearAgo = subMonths(new Date(), 12);
     const transactionsRef = collection(firestore, 'financial_transactions');
     const q = query(

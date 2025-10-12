@@ -2,11 +2,9 @@
 
 import { addDoc, collection } from 'firebase/firestore';
 import { z } from 'zod';
-import { getSdks } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { getAdminSdks } from '@/firebase/server';
 import type { Client } from '@/lib/types';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Schema for validating form data
 const clientSchema = z.object({
@@ -20,7 +18,7 @@ const clientSchema = z.object({
  * This function runs on the server and saves a new client to Firestore.
  */
 export async function addClientAction(formData: FormData) {
-  const { firestore } = getSdks();
+  const { firestore } = getAdminSdks();
   const rawData = Object.fromEntries(formData.entries());
 
   // 1. Validate data on the server
@@ -52,12 +50,6 @@ export async function addClientAction(formData: FormData) {
     console.error('Firestore Error (addClientAction):', error);
     // In a real app, you might want to use the error emitter for permission errors
     // but for a general failure, returning an error message is fine.
-    const permissionError = new FirestorePermissionError({
-      path: 'clients',
-      operation: 'create',
-      requestResourceData: newClientData,
-    });
-    errorEmitter.emit('permission-error', permissionError);
     return {
       success: false,
       error: 'Failed to save client to the database.',
