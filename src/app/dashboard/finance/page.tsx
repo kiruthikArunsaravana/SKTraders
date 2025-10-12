@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { PlusCircle, Calendar as CalendarIcon, Filter, Wand2, Loader2, Download } from 'lucide-react';
@@ -209,7 +207,10 @@ export default function FinancePage() {
         endDate = plDateRange.to;
         break;
       default:
-        return [];
+        // By default, let's take the current month
+        startDate = startOfMonth(new Date());
+        endDate = endOfMonth(new Date());
+        break;
     }
 
     return transactions.filter(t => {
@@ -250,7 +251,7 @@ export default function FinancePage() {
     };
   }, [filteredTransactions]);
 
-  const handleGeneratePdf = async () => {
+  const handleGeneratePdf = () => {
     const doc = new jsPDF();
     
     // Add header
@@ -263,37 +264,41 @@ export default function FinancePage() {
 
     const dateRangeText = plDateRange?.from && plDateRange?.to 
       ? `Date Range: ${format(plDateRange.from, 'PPP')} - ${format(plDateRange.to, 'PPP')}`
-      : `Date: ${format(new Date(), 'PPP')}`;
+      : `Date Range: ${plFilter.charAt(0).toUpperCase() + plFilter.slice(1)}`;
     doc.text(dateRangeText, 14, 36);
 
-    // Add chart
-    const chartElement = chartContainerRef.current?.querySelector('canvas');
-    if (chartElement) {
+    const chartParent = chartContainerRef.current;
+    if (chartParent) {
+      const canvas = chartParent.querySelector('canvas');
+      if (canvas) {
         try {
-            const imgData = chartElement.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 14, 45, 180, 80);
+          const imgData = canvas.toDataURL('image/png');
+          doc.addImage(imgData, 'PNG', 14, 45, 180, 80);
         } catch (error) {
-            console.error("Error generating chart image:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Could not generate chart image',
-                description: 'The chart could not be converted to an image for the PDF.',
-            });
+          console.error("Error generating chart image:", error);
+          toast({
+            variant: 'destructive',
+            title: 'Could not generate chart image',
+            description: 'There was an issue capturing the chart for the PDF.',
+          });
         }
+      }
     }
-
 
     // Add table
     const tableData = filteredTransactions.map(t => {
-        const income = t.type === 'income' ? `$${t.amount.toLocaleString()}` : '-';
-        const expense = t.type === 'expense' ? `$${Math.abs(t.amount).toLocaleString()}` : '-';
-        const profitLoss = t.type === 'income' ? t.amount : t.amount;
-        return [format(new Date(t.date), 'PP'), income, expense, profitLoss >= 0 ? `$${profitLoss.toLocaleString()}`: `-$${Math.abs(profitLoss).toLocaleString()}`];
+        return [
+          format(new Date(t.date), 'PP'),
+          t.description,
+          t.category,
+          t.type === 'income' ? 'Income' : 'Expense',
+          t.type === 'income' ? `$${t.amount.toLocaleString()}` : `-$${Math.abs(t.amount).toLocaleString()}`,
+        ];
     });
 
     autoTable(doc, {
       startY: 135,
-      head: [['Date', 'Income', 'Expense', 'Profit/Loss']],
+      head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
