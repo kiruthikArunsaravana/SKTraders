@@ -140,7 +140,7 @@ export default function FinancePage() {
 
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
     if (!range?.from || !range?.to || !trans) {
-      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map() };
+      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
 
     const startDate = range.from;
@@ -177,6 +177,7 @@ export default function FinancePage() {
       totalExpenses: Math.abs(totalExpenses),
       netProfit: totalIncome + totalExpenses,
       dailyData,
+      transactions: filtered,
     };
   };
 
@@ -210,7 +211,87 @@ export default function FinancePage() {
   }, [transactions, dateRange1, dateRange2]);
 
   const handleGeneratePdf = () => {
-     // Implementation remains the same
+    if (!dateRange1?.from || !dateRange1?.to) {
+      toast({
+        variant: "destructive",
+        title: "No Data",
+        description: "Please select at least one date range to generate a report.",
+      });
+      return;
+    }
+    
+    const doc = new jsPDF();
+    const title = 'Financial Comparison Report';
+    
+    doc.setFont('Playfair Display', 'bold');
+    doc.setFontSize(22);
+    doc.text(title, 14, 22);
+    
+    doc.setFont('PT Sans', 'normal');
+    doc.setFontSize(11);
+    doc.text(`For SK Traders`, 14, 30);
+    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 36);
+
+    let finalY = 45;
+
+    const drawSummary = (periodName: string, summary: typeof summary1, range: DateRange) => {
+        doc.setFontSize(16);
+        doc.setFont('Playfair Display', 'bold');
+        doc.text(periodName, 14, finalY);
+        finalY += 8;
+        
+        doc.setFont('PT Sans', 'normal');
+        doc.setFontSize(11);
+        doc.text(`Period: ${format(range.from!, 'PPP')} - ${format(range.to!, 'PPP')}`, 14, finalY);
+        finalY += 8;
+
+        doc.text(`Total Income: $${summary.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
+        finalY += 6;
+        doc.text(`Total Expenses: $${summary.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
+        finalY += 8;
+        
+        doc.setFont('PT Sans', 'bold');
+        doc.text(`Net Profit / Loss: $${summary.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
+        finalY += 12;
+    };
+
+    drawSummary("Period 1 Summary", summary1, dateRange1);
+
+    if (dateRange2?.from && dateRange2?.to) {
+        drawSummary("Period 2 Summary", summary2, dateRange2);
+    }
+
+    const allTransactionsForPdf = [...summary1.transactions, ...summary2.transactions];
+    const uniqueTransactions = Array.from(new Map(allTransactionsForPdf.map(t => [t.id, t])).values());
+
+    if(uniqueTransactions.length > 0) {
+        const tableData = uniqueTransactions.map(t => [
+            format(t.date.toDate(), 'yyyy-MM-dd'),
+            t.description,
+            t.category,
+            t.type.charAt(0).toUpperCase() + t.type.slice(1),
+            `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ]);
+
+        autoTable(doc, {
+            startY: finalY,
+            head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: { fillColor: [40, 50, 80] },
+        });
+
+        finalY = (doc as any).lastAutoTable.finalY || finalY;
+    }
+
+    doc.setFontSize(10);
+    doc.text(`--- End of Report ---`, 14, finalY + 10);
+
+    doc.save(`HuskTrack-Finance-Comparison-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast({
+      title: "PDF Report Generated",
+      description: "Your report has been successfully downloaded.",
+    });
   };
 
   const { todaysIncome, todaysExpenses, monthlySummary } = useMemo(() => {
