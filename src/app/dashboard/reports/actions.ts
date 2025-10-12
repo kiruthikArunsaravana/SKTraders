@@ -2,7 +2,7 @@
 
 import { generateReport } from '@/ai/flows/generate-report';
 import { transactions as allTransactions } from '@/lib/data';
-import { isWithinInterval } from 'date-fns';
+import { isWithinInterval, format } from 'date-fns';
 
 export async function generateClientReport(
   reportDescription: string,
@@ -25,15 +25,15 @@ export async function generateClientReport(
 
   const contextString = `
       Report Request: ${reportDescription}
-      Date Range: ${fromDate.toDateString()} to ${toDate.toDateString()}
+      Date Range: ${format(fromDate, 'PPP')} to ${format(toDate, 'PPP')}
       
-      Transactions:
+      Transactions Data:
       ${filteredTransactions
         .map(
           t =>
-            `- ${new Date(t.date).toLocaleDateString()}: ${t.type} of $${Math.abs(
+            `- Date: ${format(new Date(t.date), 'yyyy-MM-dd')}, Type: ${t.type}, Amount: $${Math.abs(
               t.amount
-            )} for '${t.product}' related to '${t.clientName}'`
+            )}, Product: '${t.product}', Client: '${t.clientName}'`
         )
         .join('\n')}
     `;
