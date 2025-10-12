@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { placeholderImages } from '@/lib/placeholder-images.json';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,34 +13,56 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, Lock, Loader2 } from 'lucide-react';
-import { handleSignIn } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginPage() {
   const loginBg = placeholderImages.find((p) => p.id === 'login-background');
   const { toast } = useToast();
   const router = useRouter();
+  const auth = useAuth();
   const [isPending, setPending] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPending(true);
     const formData = new FormData(event.currentTarget);
-    const { success, error } = await handleSignIn(formData);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
 
-    if (success) {
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome to HuskTrack.',
-      });
-      router.push('/dashboard');
-    } else {
+    if (!email || !password) {
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: error || 'An unknown error occurred.',
+        description: 'Email and password are required.',
+      });
+      setPending(false);
+      return;
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged in the layout will handle the redirect
+      toast({
+        title: 'Login Successful',
+        description: 'Redirecting to dashboard...',
+      });
+      // The redirect is handled by the effect in DashboardLayout
+      // but we can push it here for a faster transition.
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error('Login Error:', error);
+      let errorMessage = 'An unknown error occurred.';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        errorMessage = 'Invalid credentials. Please check your email and password.';
+      }
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: errorMessage,
       });
       setPending(false);
     }
