@@ -18,15 +18,14 @@ export function FirebaseClientProvider({
     const password = 'SecureP@ss123';
 
     // This logic ensures the admin user exists for the first-time app setup.
-    // It runs only once on the client side.
+    // It runs only once on the client side when the app first loads.
     const ensureAdminUser = async () => {
       try {
         // This will only succeed on the very first load if the user doesn't exist.
-        // It signs the user in automatically after creation.
         await createUserWithEmailAndPassword(services.auth, email, password);
-        console.log("Admin user created and signed in automatically.");
+        console.log("Admin user account created.");
       } catch (error: any) {
-        // 'auth/email-already-in-use' is the expected error on subsequent loads.
+        // 'auth/email-already-in-use' is the expected error on all subsequent loads.
         // We can safely ignore it. Other errors might indicate a problem.
         if (error.code !== 'auth/email-already-in-use') {
           console.error("Could not ensure admin user exists:", error);
