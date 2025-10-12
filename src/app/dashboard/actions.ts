@@ -1,17 +1,17 @@
 'use server';
 
-import mysql from 'mysql2/promise';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'sktraders',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
+  orderBy,
+  Timestamp,
+} from 'firebase/firestore';
+import { getSdks } from '@/firebase';
+import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import type { FinancialTransaction, Export } from '@/lib/types';
 
 type KpiData = {
   totalRevenue: number;
@@ -19,155 +19,226 @@ type KpiData = {
   netProfit: number;
   revenueChange: number; // Percentage change from last month
   expensesChange: number; // Percentage change from last month
-  topProduct: { name: string | null; unitsSold: number | null; };
+  topProduct: { name: string | null; unitsSold: number | null };
   totalExportValue: number;
 };
 
 type RecentTransaction = {
-    id: string;
-    clientName: string;
-    product: string;
-    amount: number;
-    type: 'Income' | 'Expense';
-    clientAvatarUrl: string; // Placeholder for now
+  id: string;
+  clientName: string;
+  product: string;
+  amount: number;
+  type: 'Income' | 'Expense';
+  clientAvatarUrl: string; // Placeholder for now
 };
 
 type SalesByMonth = {
-    month: string;
-    sales: number;
-    expenses: number;
+  month: string;
+  sales: number;
+  expenses: number;
 };
 
+async function getFinancialsForPeriod(
+  startDate: Date,
+  endDate: Date
+): Promise<{ revenue: number; expenses: number }> {
+  const { firestore } = getSdks();
+  const transactionsRef = collection(firestore, 'financial_transactions');
+
+  const incomeQuery = query(
+    transactionsRef,
+    where('type', '==', 'income'),
+    where('date', '>=', Timestamp.fromDate(startDate)),
+    where('date', '<=', Timestamp.fromDate(endDate))
+  );
+  const expenseQuery = query(
+    transactionsRef,
+    where('type', '==', 'expense'),
+    where('date', '>=', Timestamp.fromDate(startDate)),
+    where('date', '<=', Timestamp.fromDate(endDate))
+  );
+
+  const [incomeSnapshot, expenseSnapshot] = await Promise.all([
+    getDocs(incomeQuery),
+    getDocs(expenseQuery),
+  ]);
+
+  const revenue = incomeSnapshot.docs.reduce(
+    (sum, doc) => sum + doc.data().amount,
+    0
+  );
+  const expenses = expenseSnapshot.docs.reduce(
+    (sum, doc) => sum + doc.data().amount,
+    0
+  );
+
+  return { revenue, expenses: Math.abs(expenses) };
+}
 
 export async function getDashboardKpiData(): Promise<KpiData> {
-    const connection = await pool.getConnection();
-    try {
-        const now = new Date();
-        const thisMonthStart = format(startOfMonth(now), 'yyyy-MM-dd HH:mm:ss');
-        const thisMonthEnd = format(endOfMonth(now), 'yyyy-MM-dd HH:mm:ss');
-        const lastMonth = subMonths(now, 1);
-        const lastMonthStart = format(startOfMonth(lastMonth), 'yyyy-MM-dd HH:mm:ss');
-        const lastMonthEnd = format(endOfMonth(lastMonth), 'yyyy-MM-dd HH:mm:ss');
+  try {
+    const { firestore } = getSdks();
+    const now = new Date();
+    const thisMonthStart = startOfMonth(now);
+    const thisMonthEnd = endOfMonth(now);
+    const lastMonth = subMonths(now, 1);
+    const lastMonthStart = startOfMonth(lastMonth);
+    const lastMonthEnd = endOfMonth(lastMonth);
 
-        // This month's financials
-        const [thisMonthFinancials] = await connection.query(`
-            SELECT
-                COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as totalRevenue,
-                COALESCE(ABS(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END)), 0) as totalExpenses
-            FROM financial_transactions
-            WHERE date BETWEEN ? AND ?
-        `, [thisMonthStart, thisMonthEnd]);
+    // This month's and last month's financials
+    const [thisMonthFinancials, lastMonthFinancials] = await Promise.all([
+      getFinancialsForPeriod(thisMonthStart, thisMonthEnd),
+      getFinancialsForPeriod(lastMonthStart, lastMonthEnd),
+    ]);
 
-        // Last month's financials for comparison
-        const [lastMonthFinancials] = await connection.query(`
-            SELECT
-                COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as lastMonthRevenue,
-                COALESCE(ABS(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END)), 0) as lastMonthExpenses
-            FROM financial_transactions
-            WHERE date BETWEEN ? AND ?
-        `, [lastMonthStart, lastMonthEnd]);
-        
-        // Top product this month
-        const [topProductRows]: [any[], any] = await connection.query(`
-            SELECT category as name, COUNT(*) as unitsSold
-            FROM financial_transactions
-            WHERE type = 'income' AND date BETWEEN ? AND ?
-            GROUP BY category
-            ORDER BY unitsSold DESC
-            LIMIT 1;
-        `, [thisMonthStart, thisMonthEnd]);
+    const totalRevenue = thisMonthFinancials.revenue;
+    const totalExpenses = thisMonthFinancials.expenses;
+    const lastMonthRevenue = lastMonthFinancials.revenue;
+    const lastMonthExpenses = lastMonthFinancials.expenses;
 
-        // Total export value this month
-        const [exportRows]: [any[], any] = await connection.query(`
-            SELECT COALESCE(SUM(value), 0) as totalExportValue
-            FROM exports
-            WHERE date BETWEEN ? AND ?
-        `, [thisMonthStart, thisMonthEnd]);
+    // Top product this month
+    const topProductQuery = query(
+      collection(firestore, 'financial_transactions'),
+      where('type', '==', 'income'),
+      where('date', '>=', Timestamp.fromDate(thisMonthStart)),
+      where('date', '<=', Timestamp.fromDate(thisMonthEnd))
+    );
+    const topProductSnapshot = await getDocs(topProductQuery);
+    const productCounts: { [key: string]: number } = {};
+    topProductSnapshot.forEach((doc) => {
+      const category = doc.data().category;
+      productCounts[category] = (productCounts[category] || 0) + 1;
+    });
 
-        const thisMonth = thisMonthFinancials as any;
-        const lastMonthData = lastMonthFinancials as any;
-        
-        const totalRevenue = parseFloat(thisMonth[0].totalRevenue);
-        const totalExpenses = parseFloat(thisMonth[0].totalExpenses);
-        const lastMonthRevenue = parseFloat(lastMonthData[0].lastMonthRevenue);
-        const lastMonthExpenses = parseFloat(lastMonthData[0].lastMonthExpenses);
-
-        const revenueChange = lastMonthRevenue > 0 ? ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : (totalRevenue > 0 ? 100 : 0);
-        const expensesChange = lastMonthExpenses > 0 ? ((totalExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : (totalExpenses > 0 ? 100 : 0);
-
-        return {
-            totalRevenue,
-            totalExpenses,
-            netProfit: totalRevenue - totalExpenses,
-            revenueChange,
-            expensesChange,
-            topProduct: {
-                name: topProductRows[0]?.name || 'N/A',
-                unitsSold: topProductRows[0]?.unitsSold || 0,
-            },
-            totalExportValue: parseFloat(exportRows[0].totalExportValue),
-        };
-
-    } catch (error) {
-        console.error("Database Error (getDashboardKpiData):", error);
-        return { totalRevenue: 0, totalExpenses: 0, netProfit: 0, revenueChange: 0, expensesChange: 0, topProduct: { name: 'N/A', unitsSold: 0 }, totalExportValue: 0 };
-    } finally {
-        connection.release();
+    let topProduct = { name: 'N/A', unitsSold: 0 };
+    if (Object.keys(productCounts).length > 0) {
+        const [name, unitsSold] = Object.entries(productCounts).reduce((a, b) => a[1] > b[1] ? a : b);
+        topProduct = { name, unitsSold };
     }
+
+
+    // Total export value this month
+    const exportsQuery = query(
+      collection(firestore, 'exports'),
+      where('date', '>=', Timestamp.fromDate(thisMonthStart)),
+      where('date', '<=', Timestamp.fromDate(thisMonthEnd))
+    );
+    const exportSnapshot = await getDocs(exportsQuery);
+    const totalExportValue = exportSnapshot.docs.reduce(
+      (sum, doc) => sum + doc.data().value,
+      0
+    );
+
+    const revenueChange =
+      lastMonthRevenue > 0
+        ? ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
+        : totalRevenue > 0
+        ? 100
+        : 0;
+    const expensesChange =
+      lastMonthExpenses > 0
+        ? ((totalExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
+        : totalExpenses > 0
+        ? 100
+        : 0;
+
+    return {
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalRevenue - totalExpenses,
+      revenueChange,
+      expensesChange,
+      topProduct,
+      totalExportValue,
+    };
+  } catch (error) {
+    console.error('Firestore Error (getDashboardKpiData):', error);
+    return {
+      totalRevenue: 0,
+      totalExpenses: 0,
+      netProfit: 0,
+      revenueChange: 0,
+      expensesChange: 0,
+      topProduct: { name: 'N/A', unitsSold: 0 },
+      totalExportValue: 0,
+    };
+  }
 }
 
 export async function getRecentTransactionsAction(): Promise<RecentTransaction[]> {
-    try {
-        const [rows] = await pool.query(`
-            SELECT id, description as clientName, category as product, amount, type
-            FROM financial_transactions
-            ORDER BY date DESC
-            LIMIT 5;
-        `);
-        return (rows as any[]).map(row => ({
-            ...row,
-            type: row.type.charAt(0).toUpperCase() + row.type.slice(1),
-            amount: parseFloat(row.amount),
-            clientAvatarUrl: `https://picsum.photos/seed/${row.id}/40/40`, // Placeholder avatar
-        }));
-    } catch (error) {
-        console.error("Database Error (getRecentTransactionsAction):", error);
-        return [];
-    }
+  try {
+    const { firestore } = getSdks();
+    const transactionsRef = collection(firestore, 'financial_transactions');
+    const q = query(transactionsRef, orderBy('date', 'desc'), limit(5));
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data() as FinancialTransaction;
+      return {
+        id: doc.id,
+        clientName: data.description,
+        product: data.category,
+        amount: data.amount,
+        type: data.type.charAt(0).toUpperCase() + data.type.slice(1) as 'Income' | 'Expense',
+        clientAvatarUrl: `https://picsum.photos/seed/${doc.id}/40/40`,
+      };
+    });
+  } catch (error) {
+    console.error('Firestore Error (getRecentTransactionsAction):', error);
+    return [];
+  }
 }
 
 export async function getSalesByMonthAction(): Promise<SalesByMonth[]> {
-    try {
-        const [rows]: [any[], any] = await pool.query(`
-            SELECT
-                DATE_FORMAT(date, '%Y-%m') as month,
-                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as sales,
-                ABS(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END)) as expenses
-            FROM financial_transactions
-            WHERE date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-            GROUP BY DATE_FORMAT(date, '%Y-%m')
-            ORDER BY month ASC;
-        `);
-        
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const result: SalesByMonth[] = monthNames.map(m => ({ month: m, sales: 0, expenses: 0 }));
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const result: SalesByMonth[] = monthNames.map((m) => ({
+    month: m,
+    sales: 0,
+    expenses: 0,
+  }));
 
-        rows.forEach(row => {
-            const monthIndex = parseInt(row.month.split('-')[1], 10) - 1;
-            const monthName = monthNames[monthIndex];
-            if(monthName) {
-                const existing = result.find(r => r.month === monthName);
-                if (existing) {
-                    existing.sales = parseFloat(row.sales);
-                    existing.expenses = parseFloat(row.expenses);
-                }
-            }
-        });
+  try {
+    const { firestore } = getSdks();
+    const oneYearAgo = subMonths(new Date(), 12);
+    const transactionsRef = collection(firestore, 'financial_transactions');
+    const q = query(
+      transactionsRef,
+      where('date', '>=', Timestamp.fromDate(oneYearAgo))
+    );
+    const querySnapshot = await getDocs(q);
 
-        return result;
+    querySnapshot.forEach((doc) => {
+      const data = doc.data() as FinancialTransaction;
+      const monthIndex = data.date.toDate().getMonth();
+      const monthName = monthNames[monthIndex];
+      if (monthName) {
+        const existing = result.find((r) => r.month === monthName);
+        if (existing) {
+          if (data.type === 'income') {
+            existing.sales += data.amount;
+          } else {
+            existing.expenses += Math.abs(data.amount);
+          }
+        }
+      }
+    });
 
-    } catch (error) {
-        console.error("Database Error (getSalesByMonthAction):", error);
-        return monthNames.map(m => ({ month: m, sales: 0, expenses: 0 }));
-    }
+    return result;
+  } catch (error) {
+    console.error('Firestore Error (getSalesByMonthAction):', error);
+    return result;
+  }
 }

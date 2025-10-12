@@ -6,40 +6,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addClientAction, getClientsAction } from './actions';
+import { addClientAction } from './actions';
 import type { Client } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ClientsPage() {
   const { toast } = useToast();
-  const [clients, setClients] = useState<Client[]>([]);
   const [isDialogOpen, setDialogOpen] = useState(false);
+  
+  const firestore = useFirestore();
 
-  useEffect(() => {
-    // This fetches the initial client data from your server when the page loads.
-    // The `getClientsAction` function is where you'd put your database select query.
-    async function loadClients() {
-      const initialClients = await getClientsAction();
-      setClients(initialClients);
-    }
-    loadClients();
-  }, []);
+  // Memoize the Firestore query to prevent re-renders
+  const clientsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'clients'), orderBy('name', 'asc'));
+  }, [firestore]);
+
+  const { data: clients, isLoading } = useCollection<Omit<Client, 'id'>>(clientsQuery);
 
 
   async function handleAddClient(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     
-    // The Server Action handles the backend logic, including database insertion.
     const result = await addClientAction(formData);
 
     if (result.success && result.newClient) {
-        // Update the UI with the new client returned from the server.
-        setClients(prevClients => [...prevClients, result.newClient!]);
+        // The UI will update automatically via the useCollection hook.
         setDialogOpen(false);
+        (event.target as HTMLFormElement).reset();
         toast({
           title: "Client Added",
           description: `${result.newClient.name} has been successfully added.`,
@@ -47,7 +49,7 @@ export default function ClientsPage() {
     } else {
          toast({
             variant: "destructive",
-            title: "Error",
+            title: "Error Adding Client",
             description: Array.isArray(result.error) ? result.error.join(', ') : (result.error as string || "Could not add client."),
         });
     }
@@ -113,7 +115,17 @@ export default function ClientsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {isLoading && (
+                <>
+                  <TableRow>
+                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
+                </>
+              )}
+              {!isLoading && clients && clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
                     <div className="font-medium">{client.name}</div>
@@ -125,10 +137,17 @@ export default function ClientsPage() {
                   <TableCell className="hidden md:table-cell">
                     <Badge variant="outline">{client.country}</Badge>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{client.lastPurchaseDate}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {client.lastPurchaseDate ? format(client.lastPurchaseDate.toDate(), 'PP') : 'N/A'}
+                  </TableCell>
                   <TableCell className="text-right">${client.totalSales.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
+               {!isLoading && (!clients || clients.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">No clients found. Add one to get started.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
