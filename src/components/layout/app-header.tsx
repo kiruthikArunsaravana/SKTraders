@@ -19,11 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
   PanelLeft,
-  Search,
   Settings,
   User,
   LogOut,
@@ -36,10 +34,19 @@ import { placeholderImages } from '@/lib/placeholder-images.json';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import React from 'react';
+import { useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 export default function AppHeader() {
   const pathname = usePathname();
   const { setTheme } = useTheme();
+  const auth = useAuth();
+
+  const handleLogout = () => {
+    if (auth) {
+      signOut(auth);
+    }
+  };
 
   const avatar = placeholderImages.find((p) => p.id === 'avatar-1');
 
@@ -121,11 +128,9 @@ export default function AppHeader() {
             <Moon className="mr-2 h-4 w-4" /> Dark Mode
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/">
+          <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Logout
-            </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Client": {
@@ -428,5 +429,10 @@
       }
     ],
     "reasoning": "The Firestore structure is designed to reflect the core entities of the SK Traders application, focusing on simplicity and scalability. It uses hierarchical paths for ownership where applicable (e.g., sales, purchases and receipts related to a client). The structure uses top-level collections for main entities like `clients`, `products`, `stocks`, `sales`, `purchases`, `receipts`, `expenses`, and `exports`.  Since all users (Admin, Manager, Employee) will need to access most collections, role based access control (DBAC) will be managed via Spring Security on the backend rather than attempting complex security rules on Firestore.  The user collection is avoided since Firebase Auth handles authentication. No authorization context is denormalized into subcollections, as all role-based access will be managed on the server.  This simplifies security rules dramatically and prevents the need for authorization independence via denormalization in Firestore.\n\nQAPs are supported by structural segregation. Each collection represents a distinct entity type, enabling straightforward list operations and access control on the backend. The absence of authorization denormalization simplifies the process of securely listing and filtering documents based on user roles."
+  },
+  "auth": {
+    "providers": [
+      "email_password"
+    ]
   }
 }
