@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,6 +37,7 @@ import type { FinancialTransaction } from '@/lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const reportSchema = z.object({
   reportTitle: z.string().min(5, {
@@ -48,9 +49,17 @@ const reportSchema = z.object({
   }),
 });
 
+type ChartData = {
+  name: string;
+  income: number;
+  expenses: number;
+}
+
 export default function ReportGenerator() {
   const { toast } = useToast();
   const [isPending, setPending] = useState(false);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof reportSchema>>({
     resolver: zodResolver(reportSchema),
@@ -74,7 +83,28 @@ export default function ReportGenerator() {
         return;
       }
       
-      generatePdf(values.reportTitle, values.dateRange, transactions);
+      // Process data for chart
+      const productData: { [key: string]: { income: number; expenses: number } } = {};
+      transactions.forEach(t => {
+        if (!productData[t.category]) {
+          productData[t.category] = { income: 0, expenses: 0 };
+        }
+        if (t.type === 'income') {
+          productData[t.category].income += t.amount;
+        } else {
+          productData[t.category].expenses += Math.abs(t.amount);
+        }
+      });
+      
+      const newChartData = Object.keys(productData).map(key => ({
+        name: key,
+        income: productData[key].income,
+        expenses: productData[key].expenses,
+      }));
+
+      // Set chart data and then generate PDF in a callback to ensure chart is rendered
+      setChartData(newChartData);
+      setTimeout(() => generatePdf(values.reportTitle, values.dateRange, transactions, newChartData), 100);
 
     } catch (error) {
       console.error("Failed to generate report:", error);
@@ -88,7 +118,7 @@ export default function ReportGenerator() {
     }
   }
 
-  const generatePdf = (title: string, dateRange: { from: Date; to: Date }, transactions: FinancialTransaction[]) => {
+  const generatePdf = (title: string, dateRange: { from: Date; to: Date }, transactions: FinancialTransaction[], localChartData: ChartData[]) => {
     const doc = new jsPDF();
 
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -118,7 +148,31 @@ export default function ReportGenerator() {
     
     doc.setFont('PT Sans', 'bold');
     doc.text(`Net Profit / Loss: $${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, 84);
+
+    // Chart
+    doc.setFontSize(16);
+    doc.setFont('Playfair Display', 'bold');
+    doc.text('Performance by Product', 14, 100);
+
+    const chartParent = chartContainerRef.current;
+    if (chartParent && localChartData.length > 0) {
+      const canvas = chartParent.querySelector('canvas');
+      if (canvas) {
+        try {
+          const imgData = canvas.toDataURL('image/png', 1.0);
+          doc.addImage(imgData, 'PNG', 14, 105, 180, 80);
+        } catch (error) {
+          console.error("Error generating chart image:", error);
+          toast({
+            variant: 'destructive',
+            title: 'Could not generate chart image',
+            description: 'There was an issue capturing the chart for the PDF.',
+          });
+        }
+      }
+    }
     
+    const tableStartY = localChartData.length > 0 ? 195 : 105;
 
     // Transactions Table
     const tableData = transactions.map(t => [
@@ -130,7 +184,7 @@ export default function ReportGenerator() {
     ]);
 
     autoTable(doc, {
-      startY: 95,
+      startY: tableStartY,
       head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
       body: tableData,
       theme: 'grid',
@@ -150,13 +204,31 @@ export default function ReportGenerator() {
   };
 
   return (
+    <>
+    {/* Hidden chart for PDF generation */}
+    <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px', height: '400px' }} ref={chartContainerRef}>
+        {chartData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="income" fill="hsl(var(--chart-1))" name="Income" />
+                    <Bar dataKey="expenses" fill="hsl(var(--chart-2))" name="Expenses" />
+                </BarChart>
+            </ResponsiveContainer>
+        )}
+    </div>
+
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Generate Financial Report</CardTitle>
             <CardDescription>
-              Select a date range and provide a title for your PDF report.
+              Select a date range and provide a title for your PDF report. The report will include a summary, a product performance chart, and a detailed transaction list.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -240,5 +312,6 @@ export default function ReportGenerator() {
         </Card>
       </form>
     </Form>
+    </>
   );
 }
