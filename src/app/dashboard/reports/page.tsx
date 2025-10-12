@@ -37,7 +37,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
 import { generateReport } from '@/ai/flows/generate-report';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 
@@ -81,6 +81,11 @@ export default function ReportGenerator() {
   }): Promise<FinancialTransaction[]> {
     const { from, to } = dateRange;
     to.setHours(23, 59, 59, 999); // Ensure the end of the day is included
+    
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return [];
+    }
     
     const transactionsRef = collection(firestore, 'financial_transactions');
     const q = query(transactionsRef,
@@ -372,3 +377,5 @@ export default function ReportGenerator() {
     </div>
   );
 }
+
+    
