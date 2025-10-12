@@ -24,13 +24,7 @@ const avatar4 = placeholderImages.find(p => p.id === 'avatar-4')?.imageUrl ?? ''
 const now = new Date();
 const currentYear = now.getFullYear();
 
-export const transactions: Transaction[] = [
-  { id: '1', clientName: 'Ramesh Kumar', clientAvatarUrl: avatar1, product: 'Coco Pith', amount: 4500, date: new Date(currentYear, now.getMonth(), 2).toISOString(), type: 'Income' },
-  { id: '2', clientName: 'Raw Husk Supplier', clientAvatarUrl: avatar2, product: 'Husk Chips', amount: -12000, date: new Date(currentYear, now.getMonth(), 3).toISOString(), type: 'Expense' },
-  { id: '3', clientName: 'John Smith', clientAvatarUrl: avatar3, product: 'Coir Fiber', amount: 8750, date: new Date(currentYear, now.getMonth(), 4).toISOString(), type: 'Income' },
-  { id: '4', clientName: 'Siti Aisyah', clientAvatarUrl: avatar2, product: 'Coco Pith', amount: 6300, date: new Date(currentYear, now.getMonth(), 5).toISOString(), type: 'Income' },
-  { id: '5', clientName: 'Operational Costs', clientAvatarUrl: avatar4, product: 'Husk Chips', amount: -3500, date: new Date(currentYear, now.getMonth(), 6).toISOString(), type: 'Expense' },
-];
+export const transactions: Transaction[] = [];
 
 export const exports: Export[] = [
     { id: '1', buyerName: 'Euro Garden Supplies', country: 'Germany', port: 'Hamburg', value: 45000, date: new Date(currentYear, now.getMonth() - 1, 5).toISOString() },
