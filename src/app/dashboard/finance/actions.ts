@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { generateReport } from '@/ai/flows/generate-report';
-import { format } from 'date-fns';
+import { format, parseISO, isWithinInterval } from 'date-fns';
 import { transactions as allTransactions } from '@/lib/data';
 
 const reportSchema = z.object({
@@ -38,12 +38,12 @@ export async function handleGenerateFinanceReport(
   const { reportDescription, dateRangeFrom, dateRangeTo } = validationResult.data;
 
   try {
-    const fromDate = new Date(dateRangeFrom);
-    const toDate = new Date(dateRangeTo);
+    const fromDate = parseISO(dateRangeFrom);
+    const toDate = parseISO(dateRangeTo);
     
     const transactionsInRange = allTransactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        return transactionDate >= fromDate && transactionDate <= toDate;
+        const transactionDate = parseISO(t.date);
+        return isWithinInterval(transactionDate, { start: fromDate, end: toDate });
     });
 
     if (transactionsInRange.length === 0) {
@@ -62,7 +62,7 @@ export async function handleGenerateFinanceReport(
           type: t.type.toLowerCase() as 'income' | 'expense',
           amount: t.amount,
           description: t.clientName,
-          date: t.date,
+          date: format(parseISO(t.date), 'yyyy-MM-dd'),
           category: t.product,
         })),
     };
