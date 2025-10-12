@@ -43,24 +43,20 @@ async function getFinancialsForPeriod(
   endDate: Date
 ): Promise<{ revenue: number; expenses: number }> {
   const { firestore } = getAdminSdks();
-  const transactionsRef = collection(firestore, 'financial_transactions');
+  const transactionsRef = firestore.collection('financial_transactions');
 
-  const incomeQuery = query(
-    transactionsRef,
-    where('type', '==', 'income'),
-    where('date', '>=', Timestamp.fromDate(startDate)),
-    where('date', '<=', Timestamp.fromDate(endDate))
-  );
-  const expenseQuery = query(
-    transactionsRef,
-    where('type', '==', 'expense'),
-    where('date', '>=', Timestamp.fromDate(startDate)),
-    where('date', '<=', Timestamp.fromDate(endDate))
-  );
+  const incomeQuery = transactionsRef
+    .where('type', '==', 'income')
+    .where('date', '>=', Timestamp.fromDate(startDate))
+    .where('date', '<=', Timestamp.fromDate(endDate));
+  const expenseQuery = transactionsRef
+    .where('type', '==', 'expense')
+    .where('date', '>=', Timestamp.fromDate(startDate))
+    .where('date', '<=', Timestamp.fromDate(endDate));
 
   const [incomeSnapshot, expenseSnapshot] = await Promise.all([
-    getDocs(incomeQuery),
-    getDocs(expenseQuery),
+    incomeQuery.get(),
+    expenseQuery.get(),
   ]);
 
   const revenue = incomeSnapshot.docs.reduce(
@@ -97,13 +93,11 @@ export async function getDashboardKpiData(): Promise<KpiData> {
     const lastMonthExpenses = lastMonthFinancials.expenses;
 
     // Top product this month
-    const topProductQuery = query(
-      collection(firestore, 'financial_transactions'),
-      where('type', '==', 'income'),
-      where('date', '>=', Timestamp.fromDate(thisMonthStart)),
-      where('date', '<=', Timestamp.fromDate(thisMonthEnd))
-    );
-    const topProductSnapshot = await getDocs(topProductQuery);
+    const topProductQuery = firestore.collection('financial_transactions')
+      .where('type', '==', 'income')
+      .where('date', '>=', Timestamp.fromDate(thisMonthStart))
+      .where('date', '<=', Timestamp.fromDate(thisMonthEnd));
+    const topProductSnapshot = await topProductQuery.get();
     const productCounts: { [key: string]: number } = {};
     topProductSnapshot.forEach((doc) => {
       const category = doc.data().category;
@@ -118,12 +112,10 @@ export async function getDashboardKpiData(): Promise<KpiData> {
 
 
     // Total export value this month
-    const exportsQuery = query(
-      collection(firestore, 'exports'),
-      where('date', '>=', Timestamp.fromDate(thisMonthStart)),
-      where('date', '<=', Timestamp.fromDate(thisMonthEnd))
-    );
-    const exportSnapshot = await getDocs(exportsQuery);
+    const exportsQuery = firestore.collection('exports')
+      .where('date', '>=', Timestamp.fromDate(thisMonthStart))
+      .where('date', '<=', Timestamp.fromDate(thisMonthEnd));
+    const exportSnapshot = await exportsQuery.get();
     const totalExportValue = exportSnapshot.docs.reduce(
       (sum, doc) => sum + doc.data().value,
       0
@@ -168,9 +160,9 @@ export async function getDashboardKpiData(): Promise<KpiData> {
 export async function getRecentTransactionsAction(): Promise<RecentTransaction[]> {
   try {
     const { firestore } = getAdminSdks();
-    const transactionsRef = collection(firestore, 'financial_transactions');
-    const q = query(transactionsRef, orderBy('date', 'desc'), limit(5));
-    const querySnapshot = await getDocs(q);
+    const transactionsRef = firestore.collection('financial_transactions');
+    const q = transactionsRef.orderBy('date', 'desc').limit(5);
+    const querySnapshot = await q.get();
 
     return querySnapshot.docs.map((doc) => {
       const data = doc.data() as FinancialTransaction;
@@ -213,12 +205,9 @@ export async function getSalesByMonthAction(): Promise<SalesByMonth[]> {
   try {
     const { firestore } = getAdminSdks();
     const oneYearAgo = subMonths(new Date(), 12);
-    const transactionsRef = collection(firestore, 'financial_transactions');
-    const q = query(
-      transactionsRef,
-      where('date', '>=', Timestamp.fromDate(oneYearAgo))
-    );
-    const querySnapshot = await getDocs(q);
+    const transactionsRef = firestore.collection('financial_transactions');
+    const q = transactionsRef.where('date', '>=', Timestamp.fromDate(oneYearAgo));
+    const querySnapshot = await q.get();
 
     querySnapshot.forEach((doc) => {
       const data = doc.data() as FinancialTransaction;

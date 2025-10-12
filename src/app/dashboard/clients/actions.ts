@@ -1,12 +1,9 @@
 'use server';
 
-import { collection } from 'firebase/firestore';
 import { z } from 'zod';
 import { getAdminSdks } from '@/firebase/server';
 import type { Client } from '@/lib/types';
 import { Timestamp } from 'firebase-admin/firestore';
-import { addDoc } from 'firebase-admin/firestore';
-
 
 // Schema for validating form data
 const clientSchema = z.object({
@@ -41,17 +38,14 @@ export async function addClientAction(formData: FormData) {
   };
 
   try {
-    const clientsCollection = collection(firestore, 'clients');
-    // Using await here because we want to return the new client to the caller
-    const docRef = await addDoc(clientsCollection, newClientData);
+    const clientsCollection = firestore.collection('clients');
+    const docRef = await clientsCollection.add(newClientData);
 
     const newClient: Client = { id: docRef.id, ...newClientData };
     console.log(`Client added with ID: ${docRef.id}`);
     return { success: true, newClient };
   } catch (error) {
     console.error('Firestore Error (addClientAction):', error);
-    // In a real app, you might want to use the error emitter for permission errors
-    // but for a general failure, returning an error message is fine.
     return {
       success: false,
       error: 'Failed to save client to the database.',

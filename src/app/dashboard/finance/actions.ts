@@ -1,6 +1,5 @@
 'use server';
 
-import { addDoc, collection } from 'firebase/firestore';
 import { z } from 'zod';
 import { getAdminSdks } from '@/firebase/server';
 import type { FinancialTransaction } from '@/lib/types';
@@ -44,9 +43,8 @@ export async function addTransactionAction(formData: FormData) {
   };
 
   try {
-    const transactionsCollection = collection(firestore, 'financial_transactions');
-    // Using await to return success, but errors are handled by the emitter
-    const docRef = await addDoc(transactionsCollection, newTransactionData);
+    const transactionsCollection = firestore.collection('financial_transactions');
+    const docRef = await transactionsCollection.add(newTransactionData);
 
     const newTransaction: FinancialTransaction = {
       id: docRef.id,

@@ -2,7 +2,6 @@
 
 import type { Export } from '@/lib/types';
 import { z } from 'zod';
-import { addDoc, collection } from 'firebase/firestore';
 import { getAdminSdks } from '@/firebase/server';
 import { Timestamp } from 'firebase-admin/firestore';
 
@@ -32,8 +31,8 @@ export async function addExportAction(formData: FormData) {
   };
 
   try {
-    const exportsCollection = collection(firestore, 'exports');
-    const docRef = await addDoc(exportsCollection, newExportData);
+    const exportsCollection = firestore.collection('exports');
+    const docRef = await exportsCollection.add(newExportData);
 
     const newExport: Export = { id: docRef.id, ...newExportData };
 
