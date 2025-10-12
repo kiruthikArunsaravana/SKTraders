@@ -25,7 +25,7 @@ import type { DateRange } from 'react-day-picker';
 import { handleGenerateFinanceReport } from './actions';
 import { Textarea } from '@/components/ui/textarea';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const expenseCategories = [
@@ -291,7 +291,7 @@ export default function FinancePage() {
         return [format(new Date(t.date), 'PP'), income, expense, profitLoss >= 0 ? `$${profitLoss.toLocaleString()}`: `-$${Math.abs(profitLoss).toLocaleString()}`];
     });
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 135,
       head: [['Date', 'Income', 'Expense', 'Profit/Loss']],
       body: tableData,
