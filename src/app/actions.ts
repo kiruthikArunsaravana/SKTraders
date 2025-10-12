@@ -26,7 +26,7 @@ async function getAdminAuth() {
 
 // Default admin credentials (consider moving to environment variables)
 const ADMIN_EMAIL = 'admin@example.com';
-const ADMIN_PASSWORD = 'password';
+const ADMIN_PASSWORD = 'SecureP@ss123';
 
 /**
  * Ensures the default admin user exists in Firebase Auth.

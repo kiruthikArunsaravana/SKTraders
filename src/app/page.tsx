@@ -99,7 +99,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   required
                   className="pl-10"
-                  defaultValue="password"
+                  defaultValue="SecureP@ss123"
                 />
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <div className="mt-4 text-xs text-center text-muted-foreground">
-            <p>Use the default credentials or update them in `src/app/actions.ts`</p>
+            <p>Use the default credentials. The password is "SecureP@ss123"</p>
           </div>
         </CardContent>
       </Card>

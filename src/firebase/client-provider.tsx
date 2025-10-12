@@ -20,7 +20,7 @@ export function FirebaseClientProvider({
     signInWithEmailAndPassword(
       services.auth,
       'admin@example.com',
-      'password'
+      'SecureP@ss123'
     ).catch((error) => {
       // We can silently ignore errors here, as the user will be prompted to log in manually.
       // This is just an attempt for a smoother UX.
