@@ -3,7 +3,7 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -18,12 +18,13 @@ export function FirebaseClientProvider({
     const password = 'SecureP@ss123';
 
     // This logic ensures the admin user exists for the first-time app setup.
-    // It runs only once on the client and does not block rendering.
+    // It runs only once on the client side.
     const ensureAdminUser = async () => {
       try {
-        // This will succeed only on the very first load if the user doesn't exist.
+        // This will only succeed on the very first load if the user doesn't exist.
+        // It signs the user in automatically after creation.
         await createUserWithEmailAndPassword(services.auth, email, password);
-        console.log("Admin user created. You can now sign in.");
+        console.log("Admin user created and signed in automatically.");
       } catch (error: any) {
         // 'auth/email-already-in-use' is the expected error on subsequent loads.
         // We can safely ignore it. Other errors might indicate a problem.
@@ -33,7 +34,7 @@ export function FirebaseClientProvider({
       }
     };
     
-    // Only run this check if it hasn't been run before in this session.
+    // Only run this check if it hasn't been run before in this browser session.
     if (typeof window !== 'undefined' && !(window as any).__adminUserChecked) {
       ensureAdminUser();
       (window as any).__adminUserChecked = true;
