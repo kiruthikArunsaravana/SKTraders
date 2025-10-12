@@ -23,11 +23,21 @@ export default function LoginPage() {
   const loginBg = placeholderImages.find((p) => p.id === 'login-background');
   const { toast } = useToast();
   const router = useRouter();
-  const auth = useAuth();
+  const auth = useAuth(); // This can be null initially
   const [isPending, setPending] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    
+    if (!auth) {
+        toast({
+            variant: "destructive",
+            title: "Login Service Unavailable",
+            description: "The authentication service is not ready. Please wait a moment and try again."
+        });
+        return;
+    }
+
     setPending(true);
     const formData = new FormData(event.currentTarget);
     const email = formData.get('email') as string;
@@ -125,7 +135,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isPending}>
+            <Button type="submit" className="w-full" disabled={isPending || !auth}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
