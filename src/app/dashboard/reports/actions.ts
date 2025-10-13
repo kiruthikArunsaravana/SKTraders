@@ -1,8 +1,9 @@
 'use server';
 
-import { initializeFirebase } from '@/firebase';
+import { getDb } from '@/firebase/server';
 import { FinancialTransaction } from '@/lib/types';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
+
 
 export async function getTransactionsForDateRange(dateRange: {
   from: Date;
@@ -11,29 +12,29 @@ export async function getTransactionsForDateRange(dateRange: {
   const { from, to } = dateRange;
   to.setHours(23, 59, 59, 999); // Ensure the end of the day is included
 
-  const { firestore } = initializeFirebase();
+  const firestore = getDb();
 
-  const transactionsRef = collection(firestore, 'financial_transactions');
-  const q = query(
-    transactionsRef,
-    where('date', '>=', Timestamp.fromDate(from)),
-    where('date', '<=', Timestamp.fromDate(to))
-  );
+  const transactionsRef = firestore.collection('financial_transactions');
+  const q = transactionsRef
+    .where('date', '>=', Timestamp.fromDate(from))
+    .where('date', '<=', Timestamp.fromDate(to));
 
   try {
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await q.get();
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
+      // The data from the Admin SDK already has Timestamps that work with toDate()
       return {
         id: doc.id,
-        ...data,
-        date: data.date, // Keep as Timestamp for now
+        type: data.type,
+        amount: data.amount,
+        description: data.description,
+        date: data.date,
+        category: data.category,
       } as FinancialTransaction;
     });
   } catch (error) {
     console.error("Firestore Error (getTransactionsForDateRange):", error);
-    // In a real app, you might want to throw a more specific error
-    // or handle it in a way that the client can understand.
     throw new Error('Could not retrieve transactions from the database.');
   }
 }
