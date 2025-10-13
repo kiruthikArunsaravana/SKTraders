@@ -41,12 +41,12 @@ export default function DashboardCards() {
   const twoMonthsAgoStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
 
   // Query for transactions from the start of last month to now
-  const transactionsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(twoMonthsAgoStart)));
-  }, [firestore, twoMonthsAgoStart]);
+  // const transactionsQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(twoMonthsAgoStart)));
+  // }, [firestore, twoMonthsAgoStart]);
   
-  const { data: recentTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  // const { data: recentTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
 
 
   // Query for exports from the start of this month
@@ -59,7 +59,8 @@ export default function DashboardCards() {
   const { data: recentExports } = useCollection<Export>(exportsQuery);
 
   useEffect(() => {
-    if (!recentTransactions || !recentExports) return;
+    const recentTransactions: FinancialTransaction[] = []; // Temporary empty array
+    if (!recentExports) return;
 
     const thisMonthEnd = endOfMonth(now);
     const lastMonth = subMonths(now, 1);
@@ -122,7 +123,7 @@ export default function DashboardCards() {
       totalExportValue,
     });
 
-  }, [recentTransactions, recentExports, now, thisMonthStart]);
+  }, [recentExports, now, thisMonthStart]);
 
 
   const cards = [

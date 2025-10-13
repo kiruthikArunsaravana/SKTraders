@@ -30,7 +30,7 @@ export default function RecentTransactions() {
     return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'), limit(5));
   }, [firestore]);
 
-  const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  // const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
 
 
   return (
@@ -50,40 +50,9 @@ export default function RecentTransactions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                    <TableCell colSpan={4} className="p-2"><div className="h-8 w-full animate-pulse rounded-md bg-muted" /></TableCell>
-                </TableRow>
-            ))}
-            {!isLoading && transactions && transactions.length > 0 ? (
-              transactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="hidden h-9 w-9 sm:flex">
-                        <AvatarImage src={`https://picsum.photos/seed/${transaction.id}/40/40`} alt="Avatar" />
-                        <AvatarFallback>{transaction.description.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{transaction.description}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge className="text-xs" variant={transaction.type === 'income' ? 'default' : 'destructive'}>
-                      {transaction.type === 'income' ? 'Income' : 'Expense'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{transaction.category}</TableCell>
-                  <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {transaction.type === 'income' ? '+' : ''}
-                      ${transaction.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : !isLoading && (
-                <TableRow>
-                    <TableCell colSpan={4} className="text-center">No transactions yet.</TableCell>
-                </TableRow>
-            )}
+            <TableRow>
+              <TableCell colSpan={4} className="text-center">Feature temporarily disabled.</TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </CardContent>

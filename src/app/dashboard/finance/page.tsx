@@ -102,31 +102,31 @@ export default function FinancePage() {
   const startOfToday = startOfDay(today);
   const endOfToday = endOfDay(today);
 
-  const todaysIncomeQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'financial_transactions'),
-      where('type', '==', 'income'),
-      where('date', '>=', Timestamp.fromDate(startOfToday)),
-      where('date', '<=', Timestamp.fromDate(endOfToday)),
-      orderBy('date', 'desc')
-    );
-  }, [firestore, startOfToday, endOfToday]);
+  // const todaysIncomeQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   return query(
+  //     collection(firestore, 'financial_transactions'),
+  //     where('type', '==', 'income'),
+  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
+  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
+  //     orderBy('date', 'desc')
+  //   );
+  // }, [firestore, startOfToday, endOfToday]);
 
-  const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
+  // const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
 
-  const todaysExpensesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'financial_transactions'),
-      where('type', '==', 'expense'),
-      where('date', '>=', Timestamp.fromDate(startOfToday)),
-      where('date', '<=', Timestamp.fromDate(endOfToday)),
-      orderBy('date', 'desc')
-    );
-  }, [firestore, startOfToday, endOfToday]);
+  // const todaysExpensesQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   return query(
+  //     collection(firestore, 'financial_transactions'),
+  //     where('type', '==', 'expense'),
+  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
+  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
+  //     orderBy('date', 'desc')
+  //   );
+  // }, [firestore, startOfToday, endOfToday]);
 
-  const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
+  // const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
 
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
       if (!range?.from || !trans) {
@@ -468,22 +468,11 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isTodaysIncomeLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
-                  {!isTodaysIncomeLoading && todaysIncome && todaysIncome.length > 0
-                    ? todaysIncome.map(t => (
-                        <TableRow key={t.id}>
-                          <TableCell>{t.description}</TableCell>
-                          <TableCell>{t.category}</TableCell>
-                          <TableCell className="text-right">${t.amount.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))
-                    : !isTodaysIncomeLoading && (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center">
-                            No income recorded today.
-                          </TableCell>
-                        </TableRow>
-                      )}
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center">
+                      Feature temporarily disabled.
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
@@ -505,24 +494,11 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isTodaysExpensesLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
-                  {!isTodaysExpensesLoading && todaysExpenses && todaysExpenses.length > 0
-                    ? todaysExpenses.map(t => (
-                        <TableRow key={t.id}>
-                          <TableCell>{t.description}</TableCell>
-                          <TableCell>{t.category}</TableCell>
-                          <TableCell className="text-right">
-                            -${Math.abs(t.amount).toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    : !isTodaysExpensesLoading && (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center">
-                            No expenses recorded today.
-                          </TableCell>
-                        </TableRow>
-                      )}
+                   <TableRow>
+                      <TableCell colSpan={3} className="text-center">
+                        Feature temporarily disabled.
+                      </TableCell>
+                    </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
