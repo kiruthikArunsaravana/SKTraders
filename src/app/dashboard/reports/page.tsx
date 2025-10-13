@@ -104,13 +104,16 @@ export default function ReportGenerator() {
     doc.text(`Net Profit / Loss: $${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
     finalY += 12;
 
-    const tableData = transactions.map(t => [
-      format(t.date.toDate(), 'yyyy-MM-dd'),
-      t.description,
-      t.category,
-      t.type.charAt(0).toUpperCase() + t.type.slice(1),
-      `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ]);
+    const tableData = transactions.map(t => {
+      const date = t.date.toDate();
+      return [
+        format(date, 'yyyy-MM-dd'),
+        t.description,
+        t.category,
+        t.type.charAt(0).toUpperCase() + t.type.slice(1),
+        `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]
+    });
 
     autoTable(doc, {
       startY: finalY,
@@ -150,7 +153,7 @@ export default function ReportGenerator() {
       await generatePdf({
         title: values.reportTitle,
         dateRange: values.dateRange,
-        transactions: transactions.map(t => ({...t, date: t.date.toDate()})) as any, // Convert server timestamps
+        transactions: transactions,
       });
 
     } catch (error) {
