@@ -40,7 +40,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { FinancialTransaction } from '@/lib/types';
-import { format, isToday, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@ import {
 } from 'recharts';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const expenseCategories = [
@@ -94,8 +94,39 @@ export default function FinancePage() {
     if (!firestore) return null;
     return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
   }, [firestore]);
+  
+  const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
 
-  const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  const today = new Date();
+  const startOfToday = startOfDay(today);
+  const endOfToday = endOfDay(today);
+
+  const todaysIncomeQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'financial_transactions'),
+      where('type', '==', 'income'),
+      where('date', '>=', Timestamp.fromDate(startOfToday)),
+      where('date', '<=', Timestamp.fromDate(endOfToday)),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, startOfToday, endOfToday]);
+
+  const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
+
+  const todaysExpensesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'financial_transactions'),
+      where('type', '==', 'expense'),
+      where('date', '>=', Timestamp.fromDate(startOfToday)),
+      where('date', '<=', Timestamp.fromDate(endOfToday)),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, startOfToday, endOfToday]);
+
+  const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
+  
 
   const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -182,8 +213,8 @@ export default function FinancePage() {
   };
 
   const { summary1, summary2, combinedChartData } = useMemo(() => {
-    const summary1 = processTransactionsForRange(dateRange1, transactions || []);
-    const summary2 = processTransactionsForRange(dateRange2, transactions || []);
+    const summary1 = processTransactionsForRange(dateRange1, allTransactions || []);
+    const summary2 = processTransactionsForRange(dateRange2, allTransactions || []);
 
     let allDates: Date[] = [];
     if (dateRange1?.from) {
@@ -208,7 +239,7 @@ export default function FinancePage() {
     });
 
     return { summary1, summary2, combinedChartData: chartData };
-  }, [transactions, dateRange1, dateRange2]);
+  }, [allTransactions, dateRange1, dateRange2]);
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
@@ -296,15 +327,12 @@ export default function FinancePage() {
     });
   };
 
-  const { todaysIncome, todaysExpenses, monthlySummary } = useMemo(() => {
-    if (!transactions) {
-        return { todaysIncome: [], todaysExpenses: [], monthlySummary: processTransactionsForRange(undefined) };
+  const monthlySummary = useMemo(() => {
+    if (!allTransactions) {
+      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
-    const todaysIncome = transactions.filter(t => isToday(t.date.toDate()) && t.type === 'income');
-    const todaysExpenses = transactions.filter(t => isToday(t.date.toDate()) && t.type === 'expense');
-    const monthlySummary = processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, transactions);
-    return { todaysIncome, todaysExpenses, monthlySummary };
-  }, [transactions]);
+    return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions);
+  }, [allTransactions]);
 
 
   return (
@@ -402,7 +430,7 @@ export default function FinancePage() {
            <Card>
             <CardHeader><CardTitle>Financial Overview</CardTitle><CardDescription>A summary of your finances for this month.</CardDescription></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
-              {isLoading ? (
+              {isAllTransactionsLoading ? (
                 <>
                   <Skeleton className="h-24 w-full" />
                   <Skeleton className="h-24 w-full" />
@@ -443,8 +471,8 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
-                  {!isLoading && todaysIncome.length > 0
+                  {isTodaysIncomeLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
+                  {!isTodaysIncomeLoading && todaysIncome && todaysIncome.length > 0
                     ? todaysIncome.map(t => (
                         <TableRow key={t.id}>
                           <TableCell>{t.description}</TableCell>
@@ -452,7 +480,7 @@ export default function FinancePage() {
                           <TableCell className="text-right">${t.amount.toLocaleString()}</TableCell>
                         </TableRow>
                       ))
-                    : !isLoading && (
+                    : !isTodaysIncomeLoading && (
                         <TableRow>
                           <TableCell colSpan={3} className="text-center">
                             No income recorded today.
@@ -480,8 +508,8 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
-                  {!isLoading && todaysExpenses.length > 0
+                  {isTodaysExpensesLoading && <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>}
+                  {!isTodaysExpensesLoading && todaysExpenses && todaysExpenses.length > 0
                     ? todaysExpenses.map(t => (
                         <TableRow key={t.id}>
                           <TableCell>{t.description}</TableCell>
@@ -491,7 +519,7 @@ export default function FinancePage() {
                           </TableCell>
                         </TableRow>
                       ))
-                    : !isLoading && (
+                    : !isTodaysExpensesLoading && (
                         <TableRow>
                           <TableCell colSpan={3} className="text-center">
                             No expenses recorded today.
@@ -712,3 +740,5 @@ export default function FinancePage() {
     </div>
   );
 }
+
+    

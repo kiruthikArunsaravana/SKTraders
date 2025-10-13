@@ -30,7 +30,7 @@ export default function RecentTransactions() {
     return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'), limit(5));
   }, [firestore]);
 
-  const { data: transactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
 
   return (
     <Card>
@@ -49,7 +49,12 @@ export default function RecentTransactions() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions && transactions.length > 0 ? (
+            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                    <TableCell colSpan={4} className="p-2"><div className="h-8 w-full animate-pulse rounded-md bg-muted" /></TableCell>
+                </TableRow>
+            ))}
+            {!isLoading && transactions && transactions.length > 0 ? (
               transactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell>
@@ -73,7 +78,7 @@ export default function RecentTransactions() {
                   </TableCell>
                 </TableRow>
               ))
-            ) : (
+            ) : !isLoading && (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center">No transactions yet.</TableCell>
                 </TableRow>
@@ -84,3 +89,5 @@ export default function RecentTransactions() {
     </Card>
   );
 }
+
+    
