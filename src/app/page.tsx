@@ -3,9 +3,8 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,15 +50,47 @@ export default function LoginPage() {
           title: 'Login Successful',
           description: 'Redirecting you to the dashboard...',
         });
-        // The useEffect hook will handle the redirect
       })
-      .catch((error: any) => {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Invalid credentials. Please check your email and password, or sign up if you don't have an account.",
-        });
-        setIsSigningIn(false);
+      .catch((signInError: any) => {
+        // This error code covers user-not-found and wrong-password, but in this flow,
+        // we'll attempt to create a user if login fails for this reason.
+        if (signInError.code === 'auth/invalid-credential' || signInError.code === 'auth/user-not-found') {
+          if (password.length < 6) {
+              toast({
+                variant: "destructive",
+                title: "Password Too Short",
+                description: "Your password must be at least 6 characters to create an account.",
+              });
+              setIsSigningIn(false);
+              return;
+          }
+          // Attempt to create a new user
+          createUserWithEmailAndPassword(auth, email, password)
+            .then(() => {
+              toast({
+                title: 'Account Created & Logged In',
+                description: 'A new account has been created for you.',
+              });
+            })
+            .catch((signUpError: any) => {
+              // This can happen if the password is too weak, or email is malformed,
+              // or if the user exists but the password was wrong in the first place.
+              toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "Invalid credentials. Please check your email and password.",
+              });
+              setIsSigningIn(false);
+            });
+        } else {
+          // Handle other specific sign-in errors
+          toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: signInError.message || "An unexpected error occurred. Please try again.",
+          });
+          setIsSigningIn(false);
+        }
       });
   };
   
@@ -107,16 +138,10 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isSigningIn}>
-                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
+                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In or Sign Up'}
               </Button>
             </div>
           </form>
-           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline">
-              Sign up
-            </Link>
-          </div>
         </div>
       </div>
       <div className="hidden bg-muted lg:block">
