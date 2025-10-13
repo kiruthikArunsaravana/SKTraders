@@ -3,9 +3,8 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,15 +50,33 @@ export default function LoginPage() {
           title: 'Login Successful',
           description: 'Redirecting you to the dashboard...',
         });
-        // Let the useEffect handle the redirect
       })
-      .catch((error: any) => {
-        toast({
+      .catch((signInError: any) => {
+        // if user does not exist, create a new account
+        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+          createUserWithEmailAndPassword(auth, email, password)
+            .then(() => {
+              toast({
+                title: 'Account Created & Logged In',
+                description: 'Redirecting you to the dashboard...',
+              });
+            })
+            .catch((signUpError: any) => {
+               toast({
+                variant: "destructive",
+                title: signUpError.code === 'auth/email-already-in-use' ? 'Login Failed' : 'Sign Up Failed',
+                description: signUpError.code === 'auth/email-already-in-use' ? 'Incorrect password. Please try again.' : (signUpError.message || 'Could not create your account.'),
+              });
+              setIsSigningIn(false);
+            });
+        } else {
+          toast({
             variant: "destructive",
             title: "Login Failed",
-            description: error.message || "An unknown error occurred.",
+            description: signInError.message || "An unknown error occurred.",
           });
-        setIsSigningIn(false);
+          setIsSigningIn(false);
+        }
       });
   };
   
@@ -107,16 +124,10 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isSigningIn}>
-                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
+                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In / Sign Up'}
               </Button>
             </div>
           </form>
-           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline">
-              Sign up
-            </Link>
-          </div>
         </div>
       </div>
       <div className="hidden bg-muted lg:block">
