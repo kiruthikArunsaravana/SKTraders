@@ -4,7 +4,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,14 +13,14 @@ import { useToast } from '@/hooks/use-toast';
 import { placeholderImages } from '@/lib/placeholder-images.json';
 import { Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('SecureP@ss123');
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSigningUp, setIsSigningUp] = useState(false);
 
   const background = placeholderImages.find(p => p.id === 'login-background');
 
@@ -30,7 +30,7 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLogin = (event: FormEvent) => {
+  const handleSignUp = (event: FormEvent) => {
     event.preventDefault();
     if (!auth) {
       toast({
@@ -41,25 +41,38 @@ export default function LoginPage() {
       return;
     }
 
-    setIsSigningIn(true);
+    if (password.length < 6) {
+        toast({
+            variant: "destructive",
+            title: "Password Too Short",
+            description: "Your password must be at least 6 characters long.",
+        });
+        return;
+    }
 
-    signInWithEmailAndPassword(auth, email, password)
+    setIsSigningUp(true);
+
+    createUserWithEmailAndPassword(auth, email, password)
       .then(() => {
         toast({
-          title: 'Login Successful',
-          description: 'Redirecting you to the dashboard...',
+          title: 'Account Created',
+          description: 'You have been successfully signed up and logged in.',
         });
         // The useEffect will handle the redirect
       })
       .catch((error: any) => {
+        let description = "An unexpected error occurred. Please try again.";
+        if (error.code === 'auth/email-already-in-use') {
+            description = "This email is already in use. Please try logging in.";
+        }
         toast({
           variant: "destructive",
-          title: "Login Failed",
-          description: "Invalid credentials. Please check your email and password or sign up.",
+          title: "Sign Up Failed",
+          description,
         });
       })
       .finally(() => {
-        setIsSigningIn(false);
+        setIsSigningUp(false);
       });
   };
   
@@ -76,28 +89,26 @@ export default function LoginPage() {
       <div className="flex items-center justify-center py-12">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
-            <h1 className="text-3xl font-bold font-headline">HuskTrack Login</h1>
+            <h1 className="text-3xl font-bold font-headline">Create an Account</h1>
             <p className="text-balance text-muted-foreground">
-              Enter your credentials to access the SK Traders dashboard.
+              Enter your email below to create your account.
             </p>
           </div>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleSignUp}>
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@example.com"
+                  placeholder="name@example.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -106,15 +117,15 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isSigningIn}>
-                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
+              <Button type="submit" className="w-full" disabled={isSigningUp}>
+                {isSigningUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign Up'}
               </Button>
             </div>
           </form>
            <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline">
-              Sign up
+            Already have an account?{' '}
+            <Link href="/" className="underline">
+              Sign in
             </Link>
           </div>
         </div>
