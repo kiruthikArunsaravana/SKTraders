@@ -212,34 +212,30 @@ export default function FinancePage() {
     });
   };
 
-  const { summary1, summary2, combinedChartData } = useMemo(() => {
-    const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
-    const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
+  const summary1 = processTransactionsForRange(dateRange1, allTransactions || []);
+  const summary2 = processTransactionsForRange(dateRange2, allTransactions || []);
+  
+  const allDates: Date[] = [];
+  if (dateRange1?.from) {
+    allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to || dateRange1.from }));
+  }
+  if (dateRange2?.from) {
+    allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to || dateRange2.from }));
+  }
+  
+  const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
 
-    let allDates: Date[] = [];
-    if (dateRange1?.from) {
-      allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to || dateRange1.from }));
-    }
-    if (dateRange2?.from) {
-      allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to || dateRange2.from }));
-    }
-
-    const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
-
-    const chartData = uniqueDates.map(dateStr => {
-      const data1 = s1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
-      const data2 = s2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
-      return {
-        date: format(new Date(dateStr), 'MMM d'),
-        'Period 1 Income': data1.income,
-        'Period 1 Expenses': data1.expenses,
-        'Period 2 Income': data2.income,
-        'Period 2 Expenses': data2.expenses,
-      };
-    });
-
-    return { summary1: s1, summary2: s2, combinedChartData: chartData };
-  }, [dateRange1, dateRange2, allTransactions]);
+  const combinedChartData = uniqueDates.map(dateStr => {
+    const data1 = summary1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+    const data2 = summary2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+    return {
+      date: format(new Date(dateStr), 'MMM d'),
+      'Period 1 Income': data1.income,
+      'Period 1 Expenses': data1.expenses,
+      'Period 2 Income': data2.income,
+      'Period 2 Expenses': data2.expenses,
+    };
+  });
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
@@ -327,9 +323,7 @@ export default function FinancePage() {
     });
   };
 
-  const monthlySummary = useMemo(() => {
-    return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
-  }, [allTransactions]);
+  const monthlySummary = processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
 
 
   return (
