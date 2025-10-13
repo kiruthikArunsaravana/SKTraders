@@ -25,12 +25,15 @@ import type { FinancialTransaction } from '@/lib/types';
 export default function RecentTransactions() {
   const firestore = useFirestore();
 
-  const transactionsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'), limit(5));
-  }, [firestore]);
+  // const transactionsQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'), limit(5));
+  // }, [firestore]);
 
-  const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  // const { data: transactions, isLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  const transactions: FinancialTransaction[] | null = [];
+  const isLoading = false;
+
 
   return (
     <Card>
@@ -89,5 +92,3 @@ export default function RecentTransactions() {
     </Card>
   );
 }
-
-    

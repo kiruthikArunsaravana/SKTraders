@@ -24,13 +24,15 @@ type SalesByMonth = {
 export default function SalesChart() {
   const firestore = useFirestore();
 
-  const transactionsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    const oneYearAgo = subMonths(new Date(), 12);
-    return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(oneYearAgo)));
-  }, [firestore]);
+  // const transactionsQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   const oneYearAgo = subMonths(new Date(), 12);
+  //   return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(oneYearAgo)));
+  // }, [firestore]);
 
-  const { data: transactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  // const { data: transactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const transactions: FinancialTransaction[] | null = [];
+
 
   const salesData = useMemo(() => {
     const monthNames = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];

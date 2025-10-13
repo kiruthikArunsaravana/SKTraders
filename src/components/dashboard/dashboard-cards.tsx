@@ -41,12 +41,14 @@ export default function DashboardCards() {
   const twoMonthsAgoStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
 
   // Query for transactions from the start of last month to now
-  const transactionsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(twoMonthsAgoStart)));
-  }, [firestore, twoMonthsAgoStart]);
+  // const transactionsQuery = useMemoFirebase(() => {
+  //   if (!firestore) return null;
+  //   return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(twoMonthsAgoStart)));
+  // }, [firestore, twoMonthsAgoStart]);
   
-  const { data: recentTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  // const { data: recentTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const recentTransactions: FinancialTransaction[] | null = [];
+
 
   // Query for exports from the start of this month
   const thisMonthStart = useMemo(() => startOfMonth(now), [now]);

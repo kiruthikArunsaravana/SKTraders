@@ -80,19 +80,20 @@ export default function ReportGenerator() {
       return [];
     }
     
-    const transactionsRef = collection(firestore, 'financial_transactions');
-    const q = query(transactionsRef,
-      where('date', '>=', Timestamp.fromDate(from)),
-      where('date', '<=', Timestamp.fromDate(to))
-    );
+    // const transactionsRef = collection(firestore, 'financial_transactions');
+    // const q = query(transactionsRef,
+    //   where('date', '>=', Timestamp.fromDate(from)),
+    //   where('date', '<=', Timestamp.fromDate(to))
+    // );
   
     try {
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: (doc.data().date as Timestamp) // Ensure date is a Timestamp
-      })) as FinancialTransaction[];
+      // const querySnapshot = await getDocs(q);
+      // return querySnapshot.docs.map(doc => ({
+      //   id: doc.id,
+      //   ...doc.data(),
+      //   date: (doc.data().date as Timestamp) // Ensure date is a Timestamp
+      // })) as FinancialTransaction[];
+      return [];
     } catch (error) {
       console.error("Firestore Error (getTransactionsForDateRange):", error);
       toast({ variant: 'destructive', title: 'Error fetching data', description: 'Could not retrieve transactions from the database.' });
