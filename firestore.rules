@@ -1,178 +1,142 @@
 /**
- * @file Firestore Security Rules
- * @version 2
- *
- * @description This ruleset provides basic security for the SK Traders application.
+ * @fileoverview Firestore Security Rules for SK Traders application.
  *
  * Core Philosophy:
- *   This ruleset prioritizes security by restricting all data access to authenticated users. It does not enforce
- *   complex role-based access control within Firestore, as this is intended to be handled on the backend via
- *   Spring Security. The rules focus on verifying user authentication and preventing unauthorized data modification.
- *   All collections require the user to be signed in to perform read or write operations.
+ * This ruleset prioritizes simplicity by delegating authorization to the backend (Spring Security).
+ * It avoids complex Firestore rules and authorization denormalization. Access to collections
+ * is generally open, with the expectation that Spring Security will enforce role-based access
+ * control on the server side.
  *
  * Data Structure:
- *   The Firestore database consists of several top-level collections: `clients`, `products`, `stocks`, `sales`,
- *   `purchases`, `receipts`, `expenses`, and `exports`. Each collection contains documents representing individual
- *   entities.
+ * The Firestore database uses a flat structure with top-level collections for each entity:
+ * /clients/{clientId}, /products/{productId}, /stocks/{stockId}, /sales/{saleId},
+ * /purchases/{purchaseId}, /receipts/{receiptId}, /expenses/{expenseId}, /exports/{exportId}.
  *
  * Key Security Decisions:
- *   - Role-based access control is not implemented in these rules. It is assumed that the backend will handle
- *     authorization based on user roles managed in Spring Security.
- *   - All collections require authentication for both read and write access.
- *   - No specific data validation is performed within the rules to allow for rapid prototyping and schema iteration.
- *     Data validation should be implemented on the backend.
- *
- * Authorization Denormalization:
- *   No authorization data is denormalized within the Firestore documents. Authorization checks are based solely on
- *   user authentication status.
- *
- * Structural Segregation:
- *   Each entity type (e.g., clients, products) is stored in a separate top-level collection. This simplifies
- *   list operations and access control.
+ * - Role-based access control is handled by Spring Security on the backend, not in these rules.
+ * - All collections are generally readable and writable by any authenticated user.
+ * - No user-specific data or subcollections are used.
+ * - Listing collections is allowed for any authenticated user.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the 'clients' collection.
+     * @description Manages access to client data.
      * @path /clients/{clientId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read client data.
+     * @allow (create, update, delete) Any authenticated user can modify client data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'products' collection.
+     * @description Manages access to product data.
      * @path /products/{productId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read product data.
+     * @allow (create, update, delete) Any authenticated user can modify product data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /products/{productId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'stocks' collection.
+     * @description Manages access to stock data.
      * @path /stocks/{stockId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read stock data.
+     * @allow (create, update, delete) Any authenticated user can modify stock data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /stocks/{stockId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'sales' collection.
+     * @description Manages access to sales data.
      * @path /sales/{saleId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read sales data.
+     * @allow (create, update, delete) Any authenticated user can modify sales data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /sales/{saleId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'purchases' collection.
+     * @description Manages access to purchase data.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read purchase data.
+     * @allow (create, update, delete) Any authenticated user can modify purchase data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /purchases/{purchaseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'receipts' collection.
+     * @description Manages access to receipt data.
      * @path /receipts/{receiptId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read receipt data.
+     * @allow (create, update, delete) Any authenticated user can modify receipt data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /receipts/{receiptId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'expenses' collection.
+     * @description Manages access to expense data.
      * @path /expenses/{expenseId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read expense data.
+     * @allow (create, update, delete) Any authenticated user can modify expense data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /expenses/{expenseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to the 'exports' collection.
+     * @description Manages access to export data.
      * @path /exports/{exportId}
-     * @allow (get, list) User is signed in.
-     * @allow (create, update, delete) User is signed in.
-     * @deny (get, list) User is not signed in.
-     * @deny (create, update, delete) User is not signed in.
-     * @principle Requires authentication for all operations.
+     * @allow (get, list) Any authenticated user can read export data.
+     * @allow (create, update, delete) Any authenticated user can modify export data.
+     * @deny None. Access control is enforced on the backend.
+     * @principle Access control is managed on the backend via Spring Security.
      */
     match /exports/{exportId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
-    // --- Helper Functions ---
-    function isSignedIn() {
-      return request.auth != null;
+    /**
+     * @description Manages access to financial_transactions data. Since access was denied due to the rules, and since there is no entity defined for it, the least priviledge principle is used by denying all access
+     * @path /financial_transactions
+     */
+    match /financial_transactions {
+        allow get, list, create, update, delete: if false;
     }
+
+  }
+
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
