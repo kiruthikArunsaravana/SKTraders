@@ -76,6 +76,50 @@ const incomeProducts = [
   { id: 'other', name: 'Other' },
 ];
 
+
+const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
+    if (!range?.from || !trans) {
+      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
+    }
+
+    const startDate = range.from;
+    const endDate = range.to ? new Date(range.to) : new Date(startDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    const filtered = trans.filter(t => {
+        const transactionDate = t.date.toDate();
+        return isWithinInterval(transactionDate, { start: startDate, end: endDate });
+    });
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    const dailyData = new Map<string, { income: number; expenses: number }>();
+
+    filtered.forEach(t => {
+      const day = format(t.date.toDate(), 'yyyy-MM-dd');
+      if (!dailyData.has(day)) {
+        dailyData.set(day, { income: 0, expenses: 0 });
+      }
+      const dayData = dailyData.get(day)!;
+
+      if (t.type === 'income') {
+        totalIncome += t.amount;
+        dayData.income += t.amount;
+      } else {
+        totalExpenses += t.amount;
+        dayData.expenses += Math.abs(t.amount);
+      }
+    });
+
+    return {
+      totalIncome,
+      totalExpenses: Math.abs(totalExpenses),
+      netProfit: totalIncome + totalExpenses,
+      dailyData,
+      transactions: filtered,
+    };
+  };
+
 export default function FinancePage() {
   const { toast } = useToast();
   const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
@@ -169,52 +213,9 @@ export default function FinancePage() {
     });
   };
 
-  const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
-    if (!range?.from || !trans) {
-      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
-    }
-
-    const startDate = range.from;
-    const endDate = range.to ? new Date(range.to) : new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
-
-    const filtered = trans.filter(t => {
-        const transactionDate = t.date.toDate();
-        return isWithinInterval(transactionDate, { start: startDate, end: endDate });
-    });
-
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    const dailyData = new Map<string, { income: number; expenses: number }>();
-
-    filtered.forEach(t => {
-      const day = format(t.date.toDate(), 'yyyy-MM-dd');
-      if (!dailyData.has(day)) {
-        dailyData.set(day, { income: 0, expenses: 0 });
-      }
-      const dayData = dailyData.get(day)!;
-
-      if (t.type === 'income') {
-        totalIncome += t.amount;
-        dayData.income += t.amount;
-      } else {
-        totalExpenses += t.amount;
-        dayData.expenses += Math.abs(t.amount);
-      }
-    });
-
-    return {
-      totalIncome,
-      totalExpenses: Math.abs(totalExpenses),
-      netProfit: totalIncome + totalExpenses,
-      dailyData,
-      transactions: filtered,
-    };
-  };
-
   const { summary1, summary2, combinedChartData } = useMemo(() => {
-    const summary1 = processTransactionsForRange(dateRange1, allTransactions || []);
-    const summary2 = processTransactionsForRange(dateRange2, allTransactions || []);
+    const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
+    const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
 
     let allDates: Date[] = [];
     if (dateRange1?.from) {
@@ -227,8 +228,8 @@ export default function FinancePage() {
     const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
 
     const chartData = uniqueDates.map(dateStr => {
-      const data1 = summary1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
-      const data2 = summary2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+      const data1 = s1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+      const data2 = s2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
       return {
         date: format(new Date(dateStr), 'MMM d'),
         'Period 1 Income': data1.income,
@@ -238,9 +239,8 @@ export default function FinancePage() {
       };
     });
 
-    return { summary1, summary2, combinedChartData: chartData };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(allTransactions), dateRange1, dateRange2]);
+    return { summary1: s1, summary2: s2, combinedChartData: chartData };
+  }, [allTransactions, dateRange1, dateRange2]);
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
@@ -333,8 +333,7 @@ export default function FinancePage() {
       return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
     return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(allTransactions)]);
+  }, [allTransactions]);
 
 
   return (
