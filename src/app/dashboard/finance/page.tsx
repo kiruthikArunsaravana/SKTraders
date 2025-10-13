@@ -76,48 +76,6 @@ const incomeProducts = [
   { id: 'other', name: 'Other' },
 ];
 
-const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
-      if (!range?.from || !trans) {
-        return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
-      }
-
-      const startDate = range.from;
-      const endDate = range.to ? new Date(range.to) : new Date(startDate);
-      endDate.setHours(23, 59, 59, 999);
-
-      const filtered = trans.filter(t => {
-          const transactionDate = t.date.toDate();
-          return isWithinInterval(transactionDate, { start: startDate, end: endDate });
-      });
-
-      let totalIncome = 0;
-      let totalExpenses = 0;
-      const dailyData = new Map<string, { income: number; expenses: number }>();
-
-      filtered.forEach(t => {
-        const day = format(t.date.toDate(), 'yyyy-MM-dd');
-        if (!dailyData.has(day)) {
-          dailyData.set(day, { income: 0, expenses: 0 });
-        }
-        const dayData = dailyData.get(day)!;
-
-        if (t.type === 'income') {
-          totalIncome += t.amount;
-          dayData.income += t.amount;
-        } else {
-          totalExpenses += t.amount;
-          dayData.expenses += Math.abs(t.amount);
-        }
-      });
-
-      return {
-        totalIncome,
-        totalExpenses: Math.abs(totalExpenses),
-        netProfit: totalIncome + totalExpenses,
-        dailyData,
-        transactions: filtered,
-      };
-    };
 
 export default function FinancePage() {
   const { toast } = useToast();
@@ -169,6 +127,49 @@ export default function FinancePage() {
   }, [firestore, startOfToday, endOfToday]);
 
   const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
+
+  const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
+      if (!range?.from || !trans) {
+        return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
+      }
+
+      const startDate = range.from;
+      const endDate = range.to ? new Date(range.to) : new Date(startDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      const filtered = trans.filter(t => {
+          const transactionDate = t.date.toDate();
+          return isWithinInterval(transactionDate, { start: startDate, end: endDate });
+      });
+
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      const dailyData = new Map<string, { income: number; expenses: number }>();
+
+      filtered.forEach(t => {
+        const day = format(t.date.toDate(), 'yyyy-MM-dd');
+        if (!dailyData.has(day)) {
+          dailyData.set(day, { income: 0, expenses: 0 });
+        }
+        const dayData = dailyData.get(day)!;
+
+        if (t.type === 'income') {
+          totalIncome += t.amount;
+          dayData.income += t.amount;
+        } else {
+          totalExpenses += t.amount;
+          dayData.expenses += Math.abs(t.amount);
+        }
+      });
+
+      return {
+        totalIncome,
+        totalExpenses: Math.abs(totalExpenses),
+        netProfit: totalIncome + totalExpenses,
+        dailyData,
+        transactions: filtered,
+      };
+    };
   
 
   const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -212,30 +213,37 @@ export default function FinancePage() {
     });
   };
 
-  const summary1 = processTransactionsForRange(dateRange1, allTransactions || []);
-  const summary2 = processTransactionsForRange(dateRange2, allTransactions || []);
-  
-  const allDates: Date[] = [];
-  if (dateRange1?.from) {
-    allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to || dateRange1.from }));
-  }
-  if (dateRange2?.from) {
-    allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to || dateRange2.from }));
-  }
-  
-  const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
+  const { summary1, summary2, combinedChartData } = useMemo(() => {
+    const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
+    const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
 
-  const combinedChartData = uniqueDates.map(dateStr => {
-    const data1 = summary1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
-    const data2 = summary2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
-    return {
-      date: format(new Date(dateStr), 'MMM d'),
-      'Period 1 Income': data1.income,
-      'Period 1 Expenses': data1.expenses,
-      'Period 2 Income': data2.income,
-      'Period 2 Expenses': data2.expenses,
-    };
-  });
+    const allDates: Date[] = [];
+    if (dateRange1?.from) {
+      allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to || dateRange1.from }));
+    }
+    if (dateRange2?.from) {
+      allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to || dateRange2.from }));
+    }
+    const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
+
+    const chartData = uniqueDates.map(dateStr => {
+      const data1 = s1.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+      const data2 = s2.dailyData.get(dateStr) || { income: 0, expenses: 0 };
+      return {
+        date: format(new Date(dateStr), 'MMM d'),
+        'Period 1 Income': data1.income,
+        'Period 1 Expenses': data1.expenses,
+        'Period 2 Income': data2.income,
+        'Period 2 Expenses': data2.expenses,
+      };
+    });
+
+    return { summary1: s1, summary2: s2, combinedChartData: chartData };
+  }, [dateRange1, dateRange2, JSON.stringify(allTransactions)]);
+  
+  const monthlySummary = useMemo(() => {
+    return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
+  }, [JSON.stringify(allTransactions)]);
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
@@ -322,8 +330,6 @@ export default function FinancePage() {
       description: "Your report has been successfully downloaded.",
     });
   };
-
-  const monthlySummary = processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
 
 
   return (
