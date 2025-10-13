@@ -239,7 +239,8 @@ export default function FinancePage() {
     });
 
     return { summary1, summary2, combinedChartData: chartData };
-  }, [allTransactions, dateRange1, dateRange2]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(allTransactions), dateRange1, dateRange2]);
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
@@ -332,7 +333,8 @@ export default function FinancePage() {
       return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
     return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions);
-  }, [allTransactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(allTransactions)]);
 
 
   return (
