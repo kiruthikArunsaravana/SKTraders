@@ -139,47 +139,6 @@ export default function FinancePage() {
     };
   
 
-  const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!firestore) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
-      return;
-    }
-    const formData = new FormData(event.currentTarget);
-    
-    const type = formData.get('type') as 'income' | 'expense';
-    const amount = parseFloat(formData.get('amount') as string);
-    const description = formData.get('description') as string;
-    const category = formData.get('category') as string;
-    const date = entryDate || new Date();
-
-    if (!type || !amount || !description || !category || !date) {
-      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill all fields.' });
-      return;
-    }
-
-    const finalAmount = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-  
-    const newTransactionData = {
-      type,
-      amount: finalAmount,
-      description,
-      category,
-      date: Timestamp.fromDate(date),
-    };
-    
-    const transactionsCollection = collection(firestore, 'financial_transactions');
-    addDocumentNonBlocking(transactionsCollection, newTransactionData);
-
-    setAddEntryDialogOpen(false);
-    (event.target as HTMLFormElement).reset();
-    setEntryDate(new Date()); // Reset date for next entry
-    toast({
-      title: 'Entry Added',
-      description: `A new ${type} entry for $${Math.abs(amount)} has been recorded.`,
-    });
-  };
-
   const { summary1, summary2, combinedChartData } = useMemo(() => {
     const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
     const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
@@ -305,7 +264,7 @@ export default function FinancePage() {
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <Dialog open={isAddEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button disabled>
               <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
             </Button>
           </DialogTrigger>
@@ -314,13 +273,14 @@ export default function FinancePage() {
               <DialogTitle>Add New Financial Entry</DialogTitle>
               <DialogDescription>Record a new income or expense transaction.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddEntry}>
+            <form>
               <div className="space-y-4 py-4">
                 <RadioGroup
                   defaultValue="income"
                   name="type"
                   className="flex gap-4"
                   onValueChange={setEntryType}
+                  disabled
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="income" id="income" />
@@ -331,10 +291,10 @@ export default function FinancePage() {
                     <Label htmlFor="expense">Expense</Label>
                   </div>
                 </RadioGroup>
-                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
-                <Input id="description" name="description" placeholder="Description" required />
+                <Input id="amount" name="amount" type="number" placeholder="Amount" required disabled />
+                <Input id="description" name="description" placeholder="Description" required disabled />
                 {entryType === 'expense' ? (
-                  <Select name="category" required>
+                  <Select name="category" required disabled>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
@@ -347,7 +307,7 @@ export default function FinancePage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Select name="category" required>
+                  <Select name="category" required disabled>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a product" />
                     </SelectTrigger>
@@ -365,6 +325,7 @@ export default function FinancePage() {
                     <Button
                       variant={'outline'}
                       className={cn('w-full justify-start text-left font-normal')}
+                      disabled
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
@@ -376,7 +337,7 @@ export default function FinancePage() {
                 </Popover>
               </div>
               <DialogFooter>
-                <Button type="submit">Add Entry</Button>
+                <Button type="submit" disabled>Add Entry</Button>
               </DialogFooter>
             </form>
           </DialogContent>
