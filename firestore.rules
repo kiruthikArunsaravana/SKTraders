@@ -1,119 +1,178 @@
 /**
- * @file Firestore Security Rules for SK Traders
- * @core_philosophy This ruleset provides basic protection against unauthorized data access but relies on backend role-based access control for fine-grained permissions. It focuses on preventing unauthenticated access and does not enforce strict data validation in order to enable rapid prototyping.
- * @data_structure The database consists of top-level collections for `clients`, `products`, `stocks`, `sales`, `purchases`, `receipts`, `expenses`, and `exports`. No user-specific data trees or subcollections are used.
- * @key_security_decisions Role based access control (DBAC) will be managed via Spring Security on the backend rather than attempting complex security rules on Firestore. The user collection is avoided since Firebase Auth handles authentication. No authorization context is denormalized into subcollections, as all role-based access will be managed on the server. This simplifies security rules dramatically and prevents the need for authorization independence via denormalization in Firestore.
+ * @file Firestore Security Rules
+ * @version 2
+ *
+ * @description This ruleset provides basic security for the SK Traders application.
+ *
+ * Core Philosophy:
+ *   This ruleset prioritizes security by restricting all data access to authenticated users. It does not enforce
+ *   complex role-based access control within Firestore, as this is intended to be handled on the backend via
+ *   Spring Security. The rules focus on verifying user authentication and preventing unauthorized data modification.
+ *   All collections require the user to be signed in to perform read or write operations.
+ *
+ * Data Structure:
+ *   The Firestore database consists of several top-level collections: `clients`, `products`, `stocks`, `sales`,
+ *   `purchases`, `receipts`, `expenses`, and `exports`. Each collection contains documents representing individual
+ *   entities.
+ *
+ * Key Security Decisions:
+ *   - Role-based access control is not implemented in these rules. It is assumed that the backend will handle
+ *     authorization based on user roles managed in Spring Security.
+ *   - All collections require authentication for both read and write access.
+ *   - No specific data validation is performed within the rules to allow for rapid prototyping and schema iteration.
+ *     Data validation should be implemented on the backend.
+ *
+ * Authorization Denormalization:
+ *   No authorization data is denormalized within the Firestore documents. Authorization checks are based solely on
+ *   user authentication status.
+ *
+ * Structural Segregation:
+ *   Each entity type (e.g., clients, products) is stored in a separate top-level collection. This simplifies
+ *   list operations and access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows read access to the clients collection and write access is restricted.
+     * @description Controls access to the 'clients' collection.
      * @path /clients/{clientId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access, restricts all writes. Role based access will be managed on the server.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the products collection and write access is restricted.
+     * @description Controls access to the 'products' collection.
      * @path /products/{productId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access, restricts all writes. Role based access will be managed on the server.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the stocks collection and write access is restricted.
+     * @description Controls access to the 'stocks' collection.
      * @path /stocks/{stockId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /stocks/{stockId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the sales collection and write access is restricted.
+     * @description Controls access to the 'sales' collection.
      * @path /sales/{saleId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /sales/{saleId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the purchases collection and write access is restricted.
+     * @description Controls access to the 'purchases' collection.
      * @path /purchases/{purchaseId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the receipts collection and write access is restricted.
+     * @description Controls access to the 'receipts' collection.
      * @path /receipts/{receiptId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /receipts/{receiptId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the expenses collection and write access is restricted.
+     * @description Controls access to the 'expenses' collection.
      * @path /expenses/{expenseId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /expenses/{expenseId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Allows read access to the exports collection and write access is restricted.
+     * @description Controls access to the 'exports' collection.
      * @path /exports/{exportId}
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
+     * @allow (get, list) User is signed in.
+     * @allow (create, update, delete) User is signed in.
+     * @deny (get, list) User is not signed in.
+     * @deny (create, update, delete) User is not signed in.
+     * @principle Requires authentication for all operations.
      */
     match /exports/{exportId} {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
-    /**
-     * @description Allows read access to the financial_transactions collection and write access is restricted.
-     * @path /financial_transactions
-     * @allow (get, list): if true;
-     * @deny (create, update, delete): if false;
-     * @principle Allows public read access to all documents, restricts all writes.
-     */
-        match /financial_transactions/{transactionId} {
-          allow get, list: if true;
-          allow create, update, delete: if false;
-        }
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
   }
 }
