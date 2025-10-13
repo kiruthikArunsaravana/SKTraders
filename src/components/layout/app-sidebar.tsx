@@ -6,9 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Boxes,
-  DollarSign,
   Globe,
-  BarChart3,
   Settings,
   LifeBuoy,
 } from 'lucide-react';
@@ -22,9 +20,7 @@ export default function AppSidebar() {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/clients', label: 'Clients', icon: Users },
     { href: '/dashboard/stock', label: 'Stock', icon: Boxes },
-    { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
     { href: '/dashboard/exports', label: 'Exports', icon: Globe },
-    { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
   ];
 
   const bottomNavItems: NavItem[] = [
