@@ -305,14 +305,14 @@ export default function FinancePage() {
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <Dialog open={isAddEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
           <DialogTrigger asChild>
-            <Button disabled>
+            <Button>
               <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Financial Entry</DialogTitle>
-              <DialogDescription>Record a new income or expense transaction. (This feature is temporarily disabled)</DialogDescription>
+              <DialogDescription>Record a new income or expense transaction.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddEntry}>
               <div className="space-y-4 py-4">
@@ -321,7 +321,6 @@ export default function FinancePage() {
                   name="type"
                   className="flex gap-4"
                   onValueChange={setEntryType}
-                  disabled
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="income" id="income" />
@@ -332,10 +331,10 @@ export default function FinancePage() {
                     <Label htmlFor="expense">Expense</Label>
                   </div>
                 </RadioGroup>
-                <Input id="amount" name="amount" type="number" placeholder="Amount" required disabled />
-                <Input id="description" name="description" placeholder="Description" required disabled />
+                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
+                <Input id="description" name="description" placeholder="Description" required />
                 {entryType === 'expense' ? (
-                  <Select name="category" required disabled>
+                  <Select name="category" required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
@@ -348,7 +347,7 @@ export default function FinancePage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Select name="category" required disabled>
+                  <Select name="category" required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a product" />
                     </SelectTrigger>
@@ -366,7 +365,6 @@ export default function FinancePage() {
                     <Button
                       variant={'outline'}
                       className={cn('w-full justify-start text-left font-normal')}
-                      disabled
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
@@ -378,7 +376,7 @@ export default function FinancePage() {
                 </Popover>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled>Add Entry</Button>
+                <Button type="submit">Add Entry</Button>
               </DialogFooter>
             </form>
           </DialogContent>
