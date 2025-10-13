@@ -91,9 +91,26 @@ export default function FinancePage() {
 
   const firestore = useFirestore();
 
-  
-  const allTransactions: FinancialTransaction[] = []; // Use empty array to prevent crashes
-  const isAllTransactionsLoading = false;
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
+  }, [firestore]);
+
+  const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+
+  const todaysTransactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+    return query(
+        collection(firestore, 'financial_transactions'),
+        where('date', '>=', Timestamp.fromDate(todayStart)),
+        where('date', '<=', Timestamp.fromDate(todayEnd)),
+        orderBy('date', 'desc')
+    );
+  }, [firestore]);
+
+  const { data: todaysTransactions, isLoading: isTodaysTransactionsLoading } = useCollection<FinancialTransaction>(todaysTransactionsQuery);
   
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
       if (!range?.from || !trans) {
@@ -125,23 +142,21 @@ export default function FinancePage() {
           dayData.income += t.amount;
         } else {
           totalExpenses += t.amount;
-          dayData.expenses += Math.abs(t.amount);
         }
       });
 
       return {
         totalIncome,
-        totalExpenses: Math.abs(totalExpenses),
-        netProfit: totalIncome + totalExpenses,
+        totalExpenses,
+        netProfit: totalIncome - totalExpenses,
         dailyData,
         transactions: filtered,
       };
     };
   
-
-  const { summary1, summary2, combinedChartData } = useMemo(() => {
-    const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
-    const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
+    const { summary1, summary2, combinedChartData } = useMemo(() => {
+    const s1 = processTransactionsForRange(dateRange1, allTransactions ?? []);
+    const s2 = processTransactionsForRange(dateRange2, allTransactions ?? []);
 
     const allDates: Date[] = [];
     if (dateRange1?.from) {
@@ -165,12 +180,50 @@ export default function FinancePage() {
     });
 
     return { summary1: s1, summary2: s2, combinedChartData: chartData };
-  }, [dateRange1, dateRange2, allTransactions]);
+  }, [allTransactions, dateRange1, dateRange2]);
   
   const monthlySummary = useMemo(() => {
-    return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
+    return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions ?? []);
   }, [allTransactions]);
 
+  async function handleAddEntry(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const type = formData.get('type') as 'income' | 'expense';
+    const amount = parseFloat(formData.get('amount') as string);
+    const description = formData.get('description') as string;
+    const category = formData.get('category') as string;
+    const date = entryDate || new Date();
+
+    if (isNaN(amount) || !description || !category) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields.' });
+      return;
+    }
+
+    const transactionsCollection = collection(firestore, 'financial_transactions');
+    const newTransaction = {
+      type,
+      amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+      description,
+      category,
+      date: Timestamp.fromDate(date),
+    };
+
+    addDocumentNonBlocking(transactionsCollection, newTransaction);
+    
+    setAddEntryDialogOpen(false);
+    (event.target as HTMLFormElement).reset();
+    toast({
+      title: 'Transaction Added',
+      description: `A new ${type} of $${Math.abs(amount)} has been recorded.`,
+    });
+  }
+  
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
       toast({
@@ -264,7 +317,7 @@ export default function FinancePage() {
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <Dialog open={isAddEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
           <DialogTrigger asChild>
-            <Button disabled>
+            <Button>
               <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
             </Button>
           </DialogTrigger>
@@ -273,14 +326,13 @@ export default function FinancePage() {
               <DialogTitle>Add New Financial Entry</DialogTitle>
               <DialogDescription>Record a new income or expense transaction.</DialogDescription>
             </DialogHeader>
-            <form>
+            <form onSubmit={handleAddEntry}>
               <div className="space-y-4 py-4">
                 <RadioGroup
                   defaultValue="income"
                   name="type"
                   className="flex gap-4"
                   onValueChange={setEntryType}
-                  disabled
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="income" id="income" />
@@ -291,10 +343,10 @@ export default function FinancePage() {
                     <Label htmlFor="expense">Expense</Label>
                   </div>
                 </RadioGroup>
-                <Input id="amount" name="amount" type="number" placeholder="Amount" required disabled />
-                <Input id="description" name="description" placeholder="Description" required disabled />
+                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
+                <Input id="description" name="description" placeholder="Description" required />
                 {entryType === 'expense' ? (
-                  <Select name="category" required disabled>
+                  <Select name="category" required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
@@ -307,7 +359,7 @@ export default function FinancePage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Select name="category" required disabled>
+                  <Select name="category" required>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a product" />
                     </SelectTrigger>
@@ -325,7 +377,6 @@ export default function FinancePage() {
                     <Button
                       variant={'outline'}
                       className={cn('w-full justify-start text-left font-normal')}
-                      disabled
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
@@ -337,7 +388,7 @@ export default function FinancePage() {
                 </Popover>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled>Add Entry</Button>
+                <Button type="submit">Add Entry</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -396,11 +447,21 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center">
-                      Feature temporarily disabled.
-                    </TableCell>
-                  </TableRow>
+                  {isTodaysTransactionsLoading && <TableRow><TableCell colSpan={3}><Skeleton className="w-full h-8" /></TableCell></TableRow>}
+                  {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'income').map(t => (
+                    <TableRow key={t.id}>
+                        <TableCell>{t.description}</TableCell>
+                        <TableCell>{t.category}</TableCell>
+                        <TableCell className="text-right">${t.amount.toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'income').length === 0 && (
+                     <TableRow>
+                      <TableCell colSpan={3} className="text-center">
+                        No income recorded today.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -422,11 +483,21 @@ export default function FinancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                   <TableRow>
+                   {isTodaysTransactionsLoading && <TableRow><TableCell colSpan={3}><Skeleton className="w-full h-8" /></TableCell></TableRow>}
+                   {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'expense').map(t => (
+                    <TableRow key={t.id}>
+                        <TableCell>{t.description}</TableCell>
+                        <TableCell>{t.category}</TableCell>
+                        <TableCell className="text-right">-${Math.abs(t.amount).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'expense').length === 0 && (
+                     <TableRow>
                       <TableCell colSpan={3} className="text-center">
-                        Feature temporarily disabled.
+                        No expenses recorded today.
                       </TableCell>
                     </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
