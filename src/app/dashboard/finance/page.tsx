@@ -239,11 +239,11 @@ export default function FinancePage() {
     });
 
     return { summary1: s1, summary2: s2, combinedChartData: chartData };
-  }, [dateRange1, dateRange2, JSON.stringify(allTransactions)]);
+  }, [allTransactions, dateRange1, dateRange2]);
   
   const monthlySummary = useMemo(() => {
     return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
-  }, [JSON.stringify(allTransactions)]);
+  }, [allTransactions]);
 
   const handleGeneratePdf = () => {
     if (!dateRange1?.from) {
