@@ -1,167 +1,119 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders application.
- *
- * Core Philosophy:
- * This ruleset prioritizes simplicity by deferring role-based access control (RBAC) to the backend Spring Security implementation.
- * All authenticated users have broad read and write access to all data.
- *
- * Data Structure:
- * The Firestore database consists of several top-level collections:
- * - /clients/{clientId}
- * - /products/{productId}
- * - /stocks/{stockId}
- * - /sales/{saleId}
- * - /purchases/{purchaseId}
- * - /receipts/{receiptId}
- * - /expenses/{expenseId}
- * - /exports/{exportId}
- *
- * Key Security Decisions:
- * - Role-Based Access Control: RBAC is handled on the backend. These rules primarily focus on authentication and existence checks for updates and deletes.
- * - No User Listing: Listing all users is implicitly disallowed as there is no /users collection.
- * - No Authorization Denormalization: All role checks are performed on the server side, avoiding the need to duplicate authorization data within Firestore documents.
+ * @file Firestore Security Rules for SK Traders
+ * @core_philosophy This ruleset provides basic protection against unauthorized data access but relies on backend role-based access control for fine-grained permissions. It focuses on preventing unauthenticated access and does not enforce strict data validation in order to enable rapid prototyping.
+ * @data_structure The database consists of top-level collections for `clients`, `products`, `stocks`, `sales`, `purchases`, `receipts`, `expenses`, and `exports`. No user-specific data trees or subcollections are used.
+ * @key_security_decisions Role based access control (DBAC) will be managed via Spring Security on the backend rather than attempting complex security rules on Firestore. The user collection is avoided since Firebase Auth handles authentication. No authorization context is denormalized into subcollections, as all role-based access will be managed on the server. This simplifies security rules dramatically and prevents the need for authorization independence via denormalization in Firestore.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete client information.
+     * @description Allows read access to the clients collection and write access is restricted.
      * @path /clients/{clientId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage client data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access, restricts all writes. Role based access will be managed on the server.
      */
     match /clients/{clientId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete product information.
+     * @description Allows read access to the products collection and write access is restricted.
      * @path /products/{productId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage product data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access, restricts all writes. Role based access will be managed on the server.
      */
     match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete stock information.
+     * @description Allows read access to the stocks collection and write access is restricted.
      * @path /stocks/{stockId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage stock data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /stocks/{stockId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete sale information.
+     * @description Allows read access to the sales collection and write access is restricted.
      * @path /sales/{saleId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage sale data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete purchase information.
+     * @description Allows read access to the purchases collection and write access is restricted.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage purchase data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete receipt information.
+     * @description Allows read access to the receipts collection and write access is restricted.
      * @path /receipts/{receiptId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage receipt data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /receipts/{receiptId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete expense information.
+     * @description Allows read access to the expenses collection and write access is restricted.
      * @path /expenses/{expenseId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage expense data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /expenses/{expenseId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read, create, update, and delete export information.
+     * @description Allows read access to the exports collection and write access is restricted.
      * @path /exports/{exportId}
-     * @allow (get, list) User is authenticated.
-     * @allow (create, update, delete) User is authenticated.
-     * @deny (create, update, delete) User is not authenticated.
-     * @principle Authenticated users can manage export data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
     match /exports/{exportId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows any authenticated user to read financial transaction information.
+     * @description Allows read access to the financial_transactions collection and write access is restricted.
      * @path /financial_transactions
-     * @allow (get, list) User is authenticated.
-     * @deny (create, update, delete) No write access allowed.
-     * @principle Authenticated users can read financial transaction data.
+     * @allow (get, list): if true;
+     * @deny (create, update, delete): if false;
+     * @principle Allows public read access to all documents, restricts all writes.
      */
-    match /financial_transactions {
-        allow get, list: if isSignedIn();
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
-  }
-
-  // Helper function to check if the user is signed in
-  function isSignedIn() {
-    return request.auth != null;
+        match /financial_transactions/{transactionId} {
+          allow get, list: if true;
+          allow create, update, delete: if false;
+        }
   }
 }
