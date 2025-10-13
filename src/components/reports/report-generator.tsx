@@ -122,13 +122,17 @@ export default function ReportGenerator() {
     doc.text(`Net Profit / Loss: $${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
     finalY += 12;
 
-    const tableData = transactions.map(t => [
-      format(t.date.toDate(), 'yyyy-MM-dd'),
-      t.description,
-      t.category,
-      t.type.charAt(0).toUpperCase() + t.type.slice(1),
-      `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ]);
+    const tableData = transactions.map(t => {
+      // Ensure date is a Date object before formatting
+      const date = t.date instanceof Date ? t.date : t.date.toDate();
+      return [
+        format(date, 'yyyy-MM-dd'),
+        t.description,
+        t.category,
+        t.type.charAt(0).toUpperCase() + t.type.slice(1),
+        `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ];
+    });
 
     autoTable(doc, {
       startY: finalY,
@@ -161,9 +165,17 @@ export default function ReportGenerator() {
             return;
         }
 
+        const serializableTransactions = transactions.map(t => {
+          const date = t.date instanceof Date ? t.date : t.date.toDate();
+          return {
+            ...t,
+            date: date.toISOString(), // Convert to string
+          };
+        });
+
         const contextString = `
             Report Request: ${values.analysisRequest}
-            Transactions: ${JSON.stringify(transactions.map(t => ({...t, date: t.date.toDate()})), null, 2)}
+            Transactions: ${JSON.stringify(serializableTransactions, null, 2)}
         `;
 
         const result = await generateReport(contextString);

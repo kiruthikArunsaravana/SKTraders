@@ -90,49 +90,42 @@ export default function FinancePage() {
 
   const firestore = useFirestore();
 
-  // const transactionsQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
-  // }, [firestore]);
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
+  }, [firestore]);
   
-  // const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
-  const allTransactions: FinancialTransaction[] = [];
-  const isAllTransactionsLoading = false;
-
-
+  const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  
   const today = new Date();
   const startOfToday = startOfDay(today);
   const endOfToday = endOfDay(today);
 
-  // const todaysIncomeQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(
-  //     collection(firestore, 'financial_transactions'),
-  //     where('type', '==', 'income'),
-  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
-  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
-  //     orderBy('date', 'desc')
-  //   );
-  // }, [firestore, startOfToday, endOfToday]);
+  const todaysIncomeQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'financial_transactions'),
+      where('type', '==', 'income'),
+      where('date', '>=', Timestamp.fromDate(startOfToday)),
+      where('date', '<=', Timestamp.fromDate(endOfToday)),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, startOfToday, endOfToday]);
 
-  // const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
-  const todaysIncome: FinancialTransaction[] = [];
-  const isTodaysIncomeLoading = false;
+  const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
 
-  // const todaysExpensesQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(
-  //     collection(firestore, 'financial_transactions'),
-  //     where('type', '==', 'expense'),
-  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
-  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
-  //     orderBy('date', 'desc')
-  //   );
-  // }, [firestore, startOfToday, endOfToday]);
+  const todaysExpensesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+      collection(firestore, 'financial_transactions'),
+      where('type', '==', 'expense'),
+      where('date', '>=', Timestamp.fromDate(startOfToday)),
+      where('date', '<=', Timestamp.fromDate(endOfToday)),
+      orderBy('date', 'desc')
+    );
+  }, [firestore, startOfToday, endOfToday]);
 
-  // const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
-  const todaysExpenses: FinancialTransaction[] = [];
-  const isTodaysExpensesLoading = false;
+  const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
   
 
   const handleAddEntry = async (event: React.FormEvent<HTMLFormElement>) => {
