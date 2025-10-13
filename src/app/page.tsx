@@ -31,7 +31,7 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!auth) {
       toast({
@@ -44,42 +44,43 @@ export default function LoginPage() {
 
     setIsSigningIn(true);
 
-    try {
-      // First, try to sign in. This will be the most common case.
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: 'Login Successful',
-        description: 'Redirecting you to the dashboard...',
-      });
-      // The useEffect above will handle the redirect.
-    } catch (signInError: any) {
-      if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
-        // If the user doesn't exist or credential is wrong (which can happen on first run), try to create them.
-        try {
-          await createUserWithEmailAndPassword(auth, email, password);
-          toast({
-            title: 'Account Created & Logged In',
-            description: 'Redirecting you to the dashboard...',
-          });
-          // The useEffect will handle redirect after user state changes.
-        } catch (signUpError: any) {
+    signInWithEmailAndPassword(auth, email, password)
+      .then(() => {
+        // Successful sign-in is handled by the useUser hook and useEffect.
+        // We can show a toast here if desired.
+        toast({
+          title: 'Login Successful',
+          description: 'Redirecting you to the dashboard...',
+        });
+      })
+      .catch((signInError: any) => {
+        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+          // If user doesn't exist, try creating a new account.
+          createUserWithEmailAndPassword(auth, email, password)
+            .then(() => {
+              toast({
+                title: 'Account Created & Logged In',
+                description: 'Redirecting you to the dashboard...',
+              });
+            })
+            .catch((signUpError: any) => {
+              toast({
+                variant: "destructive",
+                title: "Sign Up Failed",
+                description: signUpError.message || "Could not create your account.",
+              });
+              setIsSigningIn(false); // Stop loading on final failure.
+            });
+        } else {
+          // Handle other sign-in errors (wrong password, etc.)
           toast({
             variant: "destructive",
-            title: "Sign Up Failed",
-            description: signUpError.message || "Could not create your account.",
+            title: "Login Failed",
+            description: signInError.message || "An unknown error occurred.",
           });
+          setIsSigningIn(false); // Stop loading on final failure.
         }
-      } else {
-        // Handle other sign-in errors (wrong password, etc.)
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: signInError.message || "An unknown error occurred.",
-        });
-      }
-    } finally {
-      setIsSigningIn(false);
-    }
+      });
   };
   
   if (isUserLoading || user) {
