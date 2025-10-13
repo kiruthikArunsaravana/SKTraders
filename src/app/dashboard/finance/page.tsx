@@ -76,50 +76,6 @@ const incomeProducts = [
   { id: 'other', name: 'Other' },
 ];
 
-
-const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
-    if (!range?.from || !trans) {
-      return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
-    }
-
-    const startDate = range.from;
-    const endDate = range.to ? new Date(range.to) : new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
-
-    const filtered = trans.filter(t => {
-        const transactionDate = t.date.toDate();
-        return isWithinInterval(transactionDate, { start: startDate, end: endDate });
-    });
-
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    const dailyData = new Map<string, { income: number; expenses: number }>();
-
-    filtered.forEach(t => {
-      const day = format(t.date.toDate(), 'yyyy-MM-dd');
-      if (!dailyData.has(day)) {
-        dailyData.set(day, { income: 0, expenses: 0 });
-      }
-      const dayData = dailyData.get(day)!;
-
-      if (t.type === 'income') {
-        totalIncome += t.amount;
-        dayData.income += t.amount;
-      } else {
-        totalExpenses += t.amount;
-        dayData.expenses += Math.abs(t.amount);
-      }
-    });
-
-    return {
-      totalIncome,
-      totalExpenses: Math.abs(totalExpenses),
-      netProfit: totalIncome + totalExpenses,
-      dailyData,
-      transactions: filtered,
-    };
-  };
-
 export default function FinancePage() {
   const { toast } = useToast();
   const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
@@ -214,6 +170,49 @@ export default function FinancePage() {
   };
 
   const { summary1, summary2, combinedChartData } = useMemo(() => {
+    const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
+      if (!range?.from || !trans) {
+        return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
+      }
+
+      const startDate = range.from;
+      const endDate = range.to ? new Date(range.to) : new Date(startDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      const filtered = trans.filter(t => {
+          const transactionDate = t.date.toDate();
+          return isWithinInterval(transactionDate, { start: startDate, end: endDate });
+      });
+
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      const dailyData = new Map<string, { income: number; expenses: number }>();
+
+      filtered.forEach(t => {
+        const day = format(t.date.toDate(), 'yyyy-MM-dd');
+        if (!dailyData.has(day)) {
+          dailyData.set(day, { income: 0, expenses: 0 });
+        }
+        const dayData = dailyData.get(day)!;
+
+        if (t.type === 'income') {
+          totalIncome += t.amount;
+          dayData.income += t.amount;
+        } else {
+          totalExpenses += t.amount;
+          dayData.expenses += Math.abs(t.amount);
+        }
+      });
+
+      return {
+        totalIncome,
+        totalExpenses: Math.abs(totalExpenses),
+        netProfit: totalIncome + totalExpenses,
+        dailyData,
+        transactions: filtered,
+      };
+    };
+
     const s1 = processTransactionsForRange(dateRange1, allTransactions || []);
     const s2 = processTransactionsForRange(dateRange2, allTransactions || []);
 
@@ -332,6 +331,48 @@ export default function FinancePage() {
     if (!allTransactions) {
       return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
+     const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
+      if (!range?.from || !trans) {
+        return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
+      }
+
+      const startDate = range.from;
+      const endDate = range.to ? new Date(range.to) : new Date(startDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      const filtered = trans.filter(t => {
+          const transactionDate = t.date.toDate();
+          return isWithinInterval(transactionDate, { start: startDate, end: endDate });
+      });
+
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      const dailyData = new Map<string, { income: number; expenses: number }>();
+
+      filtered.forEach(t => {
+        const day = format(t.date.toDate(), 'yyyy-MM-dd');
+        if (!dailyData.has(day)) {
+          dailyData.set(day, { income: 0, expenses: 0 });
+        }
+        const dayData = dailyData.get(day)!;
+
+        if (t.type === 'income') {
+          totalIncome += t.amount;
+          dayData.income += t.amount;
+        } else {
+          totalExpenses += t.amount;
+          dayData.expenses += Math.abs(t.amount);
+        }
+      });
+
+      return {
+        totalIncome,
+        totalExpenses: Math.abs(totalExpenses),
+        netProfit: totalIncome + totalExpenses,
+        dailyData,
+        transactions: filtered,
+      };
+    };
     return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions);
   }, [allTransactions]);
 
@@ -741,3 +782,5 @@ export default function FinancePage() {
     </div>
   );
 }
+
+    
