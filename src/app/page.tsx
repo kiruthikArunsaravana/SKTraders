@@ -46,22 +46,21 @@ export default function LoginPage() {
 
     signInWithEmailAndPassword(auth, email, password)
       .then(() => {
-        // Successful sign-in is handled by the useUser hook and useEffect.
-        // We can show a toast here if desired.
         toast({
           title: 'Login Successful',
           description: 'Redirecting you to the dashboard...',
         });
+        // Let the useEffect handle the redirect
       })
       .catch((signInError: any) => {
         if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
-          // If user doesn't exist, try creating a new account.
           createUserWithEmailAndPassword(auth, email, password)
             .then(() => {
               toast({
                 title: 'Account Created & Logged In',
                 description: 'Redirecting you to the dashboard...',
               });
+              // Let the useEffect handle the redirect
             })
             .catch((signUpError: any) => {
               toast({
@@ -69,16 +68,15 @@ export default function LoginPage() {
                 title: "Sign Up Failed",
                 description: signUpError.message || "Could not create your account.",
               });
-              setIsSigningIn(false); // Stop loading on final failure.
+              setIsSigningIn(false);
             });
         } else {
-          // Handle other sign-in errors (wrong password, etc.)
           toast({
             variant: "destructive",
             title: "Login Failed",
             description: signInError.message || "An unknown error occurred.",
           });
-          setIsSigningIn(false); // Stop loading on final failure.
+          setIsSigningIn(false);
         }
       });
   };

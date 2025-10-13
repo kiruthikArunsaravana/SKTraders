@@ -3,9 +3,9 @@ import { Timestamp } from 'firebase/firestore';
 
 export type Client = {
   id: string;
-  name: string;
-  company: string;
-  email: string;
+  contactName: string;
+  companyName: string;
+  contactEmail: string;
   totalSales: number;
   lastPurchaseDate: Timestamp;
   country: string;
@@ -33,12 +33,14 @@ export type ExportStatus = 'To-do' | 'In Progress' | 'Completed';
 
 export type Export = {
   id: string;
-  buyerName: string;
-  country: string;
-  port: string;
-  value: number;
-  date: Timestamp;
+  clientId: string;
+  productId: string;
+  destinationCountry: string;
+  destinationPort: string;
+  quantity: number; // This is the value
+  exportDate: Timestamp;
   status: ExportStatus;
+  invoiceNumber: string;
 };
 
 export interface NavItem {

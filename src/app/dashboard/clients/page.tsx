@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Client } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +25,7 @@ export default function ClientsPage() {
 
   const clientsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'clients'), orderBy('name', 'asc'));
+    return query(collection(firestore, 'clients'), orderBy('companyName', 'asc'));
   }, [firestore]);
 
   const { data: clients, isLoading } = useCollection<Omit<Client, 'id'>>(clientsQuery);
@@ -37,21 +38,21 @@ export default function ClientsPage() {
       return;
     }
     const formData = new FormData(event.currentTarget);
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const company = formData.get('company') as string;
+    const contactName = formData.get('contactName') as string;
+    const contactEmail = formData.get('contactEmail') as string;
+    const companyName = formData.get('companyName') as string;
     const country = formData.get('country') as string;
     
-    if (!name || !email || !company || !country) {
+    if (!contactName || !contactEmail || !companyName || !country) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields.' });
        return;
     }
 
     const clientsCollection = collection(firestore, 'clients');
     const newClientData = {
-      name,
-      email,
-      company,
+      contactName,
+      contactEmail,
+      companyName,
       country,
       totalSales: 0,
       lastPurchaseDate: Timestamp.now(),
@@ -63,7 +64,7 @@ export default function ClientsPage() {
     (event.target as HTMLFormElement).reset();
     toast({
       title: "Client Added",
-      description: `${name} has been successfully added.`,
+      description: `${companyName} has been successfully added.`,
     });
   }
 
@@ -86,17 +87,17 @@ export default function ClientsPage() {
             </DialogHeader>
             <form onSubmit={handleAddClient}>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" name="name" placeholder="John Doe" required />
+                 <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input id="companyName" name="companyName" placeholder="Acme Inc." required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" placeholder="john@example.com" required />
+                  <Label htmlFor="contactName">Contact Name</Label>
+                  <Input id="contactName" name="contactName" placeholder="John Doe" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="company">Company</Label>
-                  <Input id="company" name="company" placeholder="Acme Inc." required />
+                  <Label htmlFor="contactEmail">Contact Email</Label>
+                  <Input id="contactEmail" name="contactEmail" type="email" placeholder="john@example.com" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
@@ -119,8 +120,8 @@ export default function ClientsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead className="hidden md:table-cell">Company</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead className="hidden md:table-cell">Contact</TableHead>
                 <TableHead className="hidden md:table-cell">Country</TableHead>
                 <TableHead className="hidden md:table-cell">Last Purchase</TableHead>
                 <TableHead className="text-right">Total Sales</TableHead>
@@ -140,12 +141,14 @@ export default function ClientsPage() {
               {!isLoading && clients && clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>
-                    <div className="font-medium">{client.name}</div>
+                    <div className="font-medium">{client.companyName}</div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                     <div className="font-medium">{client.contactName}</div>
                     <div className="hidden text-sm text-muted-foreground md:inline">
-                      {client.email}
+                      {client.contactEmail}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{client.company}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant="outline">{client.country}</Badge>
                   </TableCell>

@@ -91,6 +91,7 @@ export default function ReportGenerator() {
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
+        date: (doc.data().date as Timestamp) // Ensure date is a Timestamp
       })) as FinancialTransaction[];
     } catch (error) {
       console.error("Firestore Error (getTransactionsForDateRange):", error);

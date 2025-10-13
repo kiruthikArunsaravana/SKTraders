@@ -19,6 +19,7 @@ type KpiData = {
 };
 
 function formatChange(change: number) {
+    if (!isFinite(change)) return 'No prior data';
     if (change === 0) return 'No change from last month';
     const sign = change > 0 ? '+' : '';
     return `${sign}${change.toFixed(1)}% from last month`;
@@ -35,33 +36,37 @@ export default function DashboardCards() {
       topProduct: { name: 'N/A', unitsSold: 0 },
       totalExportValue: 0,
   });
-
-  const now = useMemo(() => new Date(), []);
-  const thisMonthStart = useMemo(() => startOfMonth(now), [now]);
-  const thisMonthEnd = useMemo(() => endOfMonth(now), [now]);
-  const lastMonth = useMemo(() => subMonths(now, 1), [now]);
-  const lastMonthStart = useMemo(() => startOfMonth(lastMonth), [lastMonth]);
-  const lastMonthEnd = useMemo(() => endOfMonth(lastMonth), [lastMonth]);
-
-  const allTransactionsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'financial_transactions'));
-  }, [firestore]);
   
-  const { data: allTransactions } = useCollection<FinancialTransaction>(allTransactionsQuery);
+  const now = useMemo(() => new Date(), []);
+  const twoMonthsAgoStart = useMemo(() => startOfMonth(subMonths(now, 1)), [now]);
 
-  const allExportsQuery = useMemoFirebase(() => {
+  // Query for transactions from the start of last month to now
+  const transactionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'exports'));
-  }, [firestore]);
+    return query(collection(firestore, 'financial_transactions'), where('date', '>=', Timestamp.fromDate(twoMonthsAgoStart)));
+  }, [firestore, twoMonthsAgoStart]);
+  
+  const { data: recentTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
 
-  const { data: allExports } = useCollection<Export>(allExportsQuery);
+  // Query for exports from the start of this month
+  const thisMonthStart = useMemo(() => startOfMonth(now), [now]);
+  const exportsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'exports'), where('exportDate', '>=', Timestamp.fromDate(thisMonthStart)));
+  }, [firestore, thisMonthStart]);
+
+  const { data: recentExports } = useCollection<Export>(exportsQuery);
 
   useEffect(() => {
-    if (!allTransactions || !allExports) return;
+    if (!recentTransactions || !recentExports) return;
+
+    const thisMonthEnd = endOfMonth(now);
+    const lastMonth = subMonths(now, 1);
+    const lastMonthStart = startOfMonth(lastMonth);
+    const lastMonthEnd = endOfMonth(lastMonth);
 
     const getFinancialsForPeriod = (startDate: Date, endDate: Date) => {
-        const filtered = allTransactions.filter(t => {
+        const filtered = recentTransactions.filter(t => {
             const tDate = t.date.toDate();
             return tDate >= startDate && tDate <= endDate;
         });
@@ -79,7 +84,7 @@ export default function DashboardCards() {
     const lastMonthRevenue = lastMonthFinancials.revenue;
     const lastMonthExpenses = lastMonthFinancials.expenses;
 
-    const thisMonthIncomeTransactions = allTransactions.filter(t => {
+    const thisMonthIncomeTransactions = recentTransactions.filter(t => {
         const tDate = t.date.toDate();
         return t.type === 'income' && tDate >= thisMonthStart && tDate <= thisMonthEnd;
     });
@@ -95,21 +100,16 @@ export default function DashboardCards() {
         topProduct = { name, unitsSold };
     }
 
-    const totalExportValue = allExports
-      .filter(e => {
-        const eDate = e.date.toDate();
-        return eDate >= thisMonthStart && eDate <= thisMonthEnd;
-      })
-      .reduce((sum, e) => sum + e.value, 0);
+    const totalExportValue = recentExports.reduce((sum, e) => sum + e.quantity, 0);
 
     const revenueChange =
       lastMonthRevenue > 0
         ? ((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
-        : totalRevenue > 0 ? 100 : 0;
+        : totalRevenue > 0 ? Infinity : 0;
     const expensesChange =
       lastMonthExpenses > 0
         ? ((totalExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
-        : totalExpenses > 0 ? 100 : 0;
+        : totalExpenses > 0 ? Infinity : 0;
     
     setKpiData({
       totalRevenue,
@@ -121,7 +121,7 @@ export default function DashboardCards() {
       totalExportValue,
     });
 
-  }, [allTransactions, allExports, thisMonthStart, thisMonthEnd, lastMonthStart, lastMonthEnd]);
+  }, [recentTransactions, recentExports, now, thisMonthStart]);
 
 
   const cards = [

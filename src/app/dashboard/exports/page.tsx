@@ -18,7 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Export, ExportStatus } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,7 +38,7 @@ export default function ExportsPage() {
 
   const exportsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'exports'), orderBy('date', 'desc'));
+    return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
   }, [firestore]);
 
   const { data: exports, isLoading } = useCollection<Export>(exportsQuery);
@@ -48,11 +49,15 @@ export default function ExportsPage() {
     return exports.filter(exp => {
       // Date range filter
       const isInDateRange = (() => {
-        if (!dateRange?.from || !dateRange?.to) return true; // No date range selected, include all
+        if (!dateRange?.from) return true; // No start date, include all
         const from = dateRange.from;
-        const to = new Date(dateRange.to); // Clone to avoid mutation
+        // If no end date, use start date for a single day filter
+        const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
+        
+        // Adjust 'to' date to include the entire day
         to.setHours(23, 59, 59, 999);
-        const expDate = exp.date.toDate();
+        
+        const expDate = exp.exportDate.toDate();
         return isWithinInterval(expDate, { start: from, end: to });
       })();
 
@@ -64,7 +69,7 @@ export default function ExportsPage() {
   }, [exports, dateRange, statusFilter]);
 
   const totalValue = useMemo(() => {
-    return filteredExports.reduce((acc, exp) => acc + exp.value, 0);
+    return filteredExports.reduce((acc, exp) => acc + exp.quantity, 0);
   }, [filteredExports]);
 
 
@@ -76,25 +81,28 @@ export default function ExportsPage() {
     }
 
     const formData = new FormData(event.currentTarget);
-    const buyerName = formData.get('buyerName') as string;
-    const country = formData.get('country') as string;
-    const port = formData.get('port') as string;
-    const value = parseFloat(formData.get('value') as string);
+    const clientId = formData.get('clientId') as string;
+    const destinationCountry = formData.get('destinationCountry') as string;
+    const destinationPort = formData.get('destinationPort') as string;
+    const quantity = parseFloat(formData.get('quantity') as string);
     const status = formData.get('status') as ExportStatus;
+    const invoiceNumber = formData.get('invoiceNumber') as string;
     
-    if (!buyerName || !country || !port || !value || !status) {
+    if (!clientId || !destinationCountry || !destinationPort || !quantity || !status || !invoiceNumber) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
     
     const exportsCollection = collection(firestore, 'exports');
     const newExportData = {
-      buyerName,
-      country,
-      port,
-      value,
-      date: Timestamp.now(),
+      clientId,
+      destinationCountry,
+      destinationPort,
+      quantity,
+      exportDate: Timestamp.now(),
       status,
+      invoiceNumber,
+      productId: 'coco-pith', // Defaulting to coco-pith for now
     };
     
     addDocumentNonBlocking(exportsCollection, newExportData);
@@ -103,7 +111,7 @@ export default function ExportsPage() {
     (event.target as HTMLFormElement).reset();
     toast({
       title: "Export Order Added",
-      description: `Order for ${buyerName} has been successfully added.`,
+      description: `Order for ${clientId} has been successfully added.`,
     });
   }
 
@@ -128,7 +136,7 @@ export default function ExportsPage() {
     setSelectedExport(null);
     toast({
         title: "Status Updated",
-        description: `Order for ${selectedExport.buyerName} is now "${status}".`,
+        description: `Order status has been updated to "${status}".`,
     });
   };
 
@@ -152,8 +160,9 @@ export default function ExportsPage() {
     doc.text(`For SK Traders`, 14, 30);
     
     let filterDescription = `Status: ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`;
-    if (dateRange?.from && dateRange.to) {
-        filterDescription += ` | Period: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`;
+    if (dateRange?.from) {
+        const toDate = dateRange.to || dateRange.from;
+        filterDescription += ` | Period: ${format(dateRange.from, 'PPP')} - ${format(toDate, 'PPP')}`;
     } else {
         filterDescription += ' | Period: All Time';
     }
@@ -161,17 +170,17 @@ export default function ExportsPage() {
     doc.text(filterDescription, 14, 36);
 
     const tableData = filteredExports.map((exp) => [
-      exp.buyerName,
-      exp.country,
-      exp.port,
-      format(exp.date.toDate(), 'PP'),
+      exp.clientId,
+      exp.destinationCountry,
+      exp.destinationPort,
+      format(exp.exportDate.toDate(), 'PP'),
       exp.status,
-      `$${exp.value.toLocaleString()}`
+      `$${exp.quantity.toLocaleString()}`
     ]);
 
     autoTable(doc, {
       startY: 45,
-      head: [['Buyer Name', 'Country', 'Port', 'Date', 'Status', 'Value']],
+      head: [['Client', 'Country', 'Port', 'Date', 'Status', 'Value']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -251,16 +260,16 @@ export default function ExportsPage() {
                 <form onSubmit={handleAddExportOrder}>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="buyerName">Buyer Name</Label>
-                      <Input id="buyerName" name="buyerName" placeholder="e.g., Euro Garden Supplies" required />
+                      <Label htmlFor="clientId">Client ID</Label>
+                      <Input id="clientId" name="clientId" placeholder="e.g., Euro Garden Supplies" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="country">Country</Label>
-                      <Input id="country" name="country" placeholder="e.g., Germany" required />
+                      <Label htmlFor="destinationCountry">Country</Label>
+                      <Input id="destinationCountry" name="destinationCountry" placeholder="e.g., Germany" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="port">Port</Label>
-                      <Input id="port" name="port" placeholder="e.g., Hamburg" required />
+                      <Label htmlFor="destinationPort">Port</Label>
+                      <Input id="destinationPort" name="destinationPort" placeholder="e.g., Hamburg" required />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="status">Status</Label>
@@ -275,9 +284,13 @@ export default function ExportsPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                     <div className="space-y-2">
+                      <Label htmlFor="invoiceNumber">Invoice Number</Label>
+                      <Input id="invoiceNumber" name="invoiceNumber" placeholder="INV-12345" required />
+                    </div>
                     <div className="space-y-2">
-                      <Label htmlFor="value">Value ($)</Label>
-                      <Input id="value" name="value" type="number" placeholder="45000" required />
+                      <Label htmlFor="quantity">Value ($)</Label>
+                      <Input id="quantity" name="quantity" type="number" placeholder="45000" required />
                     </div>
                   </div>
                   <DialogFooter>
@@ -295,8 +308,8 @@ export default function ExportsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Buyer Name</TableHead>
-                <TableHead className="hidden sm:table-cell">Country</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead className="hidden sm:table-cell">Destination</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
                 <TableHead className="text-right">Value</TableHead>
@@ -314,17 +327,19 @@ export default function ExportsPage() {
                 filteredExports.map((exp) => (
                   <TableRow key={exp.id}>
                     <TableCell>
-                      <div className="font-medium">{exp.buyerName}</div>
+                      <div className="font-medium">{exp.clientId}</div>
                       <div className="hidden text-sm text-muted-foreground md:inline">
-                        {exp.port}
+                        INV: {exp.invoiceNumber}
                       </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">{exp.country}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {exp.destinationCountry} ({exp.destinationPort})
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(exp.status)}>{exp.status}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{format(exp.date.toDate(), 'PP')}</TableCell>
-                    <TableCell className="text-right">${exp.value.toLocaleString()}</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(exp.exportDate.toDate(), 'PP')}</TableCell>
+                    <TableCell className="text-right">${exp.quantity.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedExport(exp); setEditDialogOpen(true); }}>
                             <Edit className="h-4 w-4" />
@@ -351,7 +366,7 @@ export default function ExportsPage() {
           <DialogHeader>
             <DialogTitle>Edit Order Status</DialogTitle>
             <DialogDescription>
-              Update the status for the order from {selectedExport?.buyerName}.
+              Update the status for the order for client {selectedExport?.clientId}.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditStatus}>
@@ -379,5 +394,3 @@ export default function ExportsPage() {
     </div>
   );
 }
-
-    

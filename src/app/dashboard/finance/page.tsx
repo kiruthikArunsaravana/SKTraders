@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -57,7 +57,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -80,7 +81,6 @@ export default function FinancePage() {
   const [isAddEntryDialogOpen, setAddEntryDialogOpen] = useState(false);
   const [entryType, setEntryType] = useState('income');
   const [entryDate, setEntryDate] = useState<Date | undefined>(new Date());
-  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const [dateRange1, setDateRange1] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -139,12 +139,12 @@ export default function FinancePage() {
   };
 
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
-    if (!range?.from || !range?.to || !trans) {
+    if (!range?.from || !trans) {
       return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
     }
 
     const startDate = range.from;
-    const endDate = range.to;
+    const endDate = range.to ? new Date(range.to) : new Date(startDate);
     endDate.setHours(23, 59, 59, 999);
 
     const filtered = trans.filter(t => {
@@ -186,11 +186,11 @@ export default function FinancePage() {
     const summary2 = processTransactionsForRange(dateRange2, transactions || []);
 
     let allDates: Date[] = [];
-    if (dateRange1?.from && dateRange1?.to) {
-      allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to }));
+    if (dateRange1?.from) {
+      allDates.push(...eachDayOfInterval({ start: dateRange1.from, end: dateRange1.to || dateRange1.from }));
     }
-    if (dateRange2?.from && dateRange2?.to) {
-      allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to }));
+    if (dateRange2?.from) {
+      allDates.push(...eachDayOfInterval({ start: dateRange2.from, end: dateRange2.to || dateRange2.from }));
     }
 
     const uniqueDates = [...new Set(allDates.map(d => format(d, 'yyyy-MM-dd')))].sort();
@@ -211,7 +211,7 @@ export default function FinancePage() {
   }, [transactions, dateRange1, dateRange2]);
 
   const handleGeneratePdf = () => {
-    if (!dateRange1?.from || !dateRange1?.to) {
+    if (!dateRange1?.from) {
       toast({
         variant: "destructive",
         title: "No Data",
@@ -235,6 +235,7 @@ export default function FinancePage() {
     let finalY = 45;
 
     const drawSummary = (periodName: string, summary: typeof summary1, range: DateRange) => {
+        if(!range.from) return;
         doc.setFontSize(16);
         doc.setFont('Playfair Display', 'bold');
         doc.text(periodName, 14, finalY);
@@ -242,7 +243,7 @@ export default function FinancePage() {
         
         doc.setFont('PT Sans', 'normal');
         doc.setFontSize(11);
-        doc.text(`Period: ${format(range.from!, 'PPP')} - ${format(range.to!, 'PPP')}`, 14, finalY);
+        doc.text(`Period: ${format(range.from, 'PPP')} - ${format(range.to || range.from, 'PPP')}`, 14, finalY);
         finalY += 8;
 
         doc.text(`Total Income: $${summary.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
@@ -257,12 +258,13 @@ export default function FinancePage() {
 
     drawSummary("Period 1 Summary", summary1, dateRange1);
 
-    if (dateRange2?.from && dateRange2?.to) {
+    if (dateRange2?.from) {
         drawSummary("Period 2 Summary", summary2, dateRange2);
     }
 
     const allTransactionsForPdf = [...summary1.transactions, ...summary2.transactions];
-    const uniqueTransactions = Array.from(new Map(allTransactionsForPdf.map(t => [t.id, t])).values());
+    const uniqueTransactions = Array.from(new Map(allTransactionsForPdf.map(t => [t.id, t])).values())
+      .sort((a, b) => a.date.toDate().getTime() - b.date.toDate().getTime());
 
     if(uniqueTransactions.length > 0) {
         const tableData = uniqueTransactions.map(t => [
@@ -641,7 +643,7 @@ export default function FinancePage() {
                 </Card>
               </div>
 
-              <div ref={chartContainerRef} className="h-[350px]">
+              <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={combinedChartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />

@@ -86,7 +86,7 @@ export default function StockPage() {
         await runTransaction(firestore, async (transaction) => {
             const productDoc = await transaction.get(productRef);
             if (!productDoc.exists()) {
-                // If doc doesn't exist, create it.
+                // If doc doesn't exist, create it with the new quantity.
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { icon, ...dbProduct } = staticProductData;
                 transaction.set(productRef, {
