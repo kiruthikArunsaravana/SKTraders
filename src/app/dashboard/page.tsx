@@ -1,4 +1,5 @@
 import DashboardCards from '@/components/dashboard/dashboard-cards';
+import SalesChart from '@/components/dashboard/sales-chart';
 
 export default function DashboardPage() {
   return (
@@ -7,7 +8,7 @@ export default function DashboardPage() {
         <DashboardCards />
       </div>
       <div>
-        {/* Other dashboard components can be added here later */}
+        <SalesChart />
       </div>
     </div>
   );
