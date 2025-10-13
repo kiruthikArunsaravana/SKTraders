@@ -1,137 +1,28 @@
-/**
- * @fileoverview Firestore Security Rules for SK Traders.
- *
- * Core Philosophy:
- * This ruleset provides basic authentication checks, but primarily relies on
- * backend (Spring Security) enforcement of role-based access control. This approach
- * simplifies the rules and allows for centralized management of user permissions.
- * All write operations are permitted for authenticated users, deferring to the
- * backend to enforce authorization.
- *
- * Data Structure:
- * The database consists of top-level collections for core entities:
- * /clients/{clientId}, /products/{productId}, /stocks/{stockId}, /sales/{saleId},
- * /purchases/{purchaseId}, /receipts/{receiptId}, /expenses/{expenseId}, and /exports/{exportId}.
- * There are no subcollections or complex hierarchical structures.
- *
- * Key Security Decisions:
- * - Role-based access control is handled on the backend.
- * - No user listing is permitted via rules.
- * - All collections are readable by any authenticated user.
- * - Write operations are allowed only for authenticated users, with further
- *   authorization checks performed on the backend.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Allows any authenticated user to read or write client data, with authorization handled on the backend.
-     * @path /clients/{clientId}
-     * @allow (get, list) - Any authenticated user can read client data.
-     * @allow (create, update, delete) - Any authenticated user can write client data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /clients/{clientId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write product data, with authorization handled on the backend.
-     * @path /products/{productId}
-     * @allow (get, list) - Any authenticated user can read product data.
-     * @allow (create, update, delete) - Any authenticated user can write product data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write product data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write stock data, with authorization handled on the backend.
-     * @path /stocks/{stockId}
-     * @allow (get, list) - Any authenticated user can read stock data.
-     * @allow (create, update, delete) - Any authenticated user can write stock data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write stock data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /stocks/{stockId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write sale data, with authorization handled on the backend.
-     * @path /sales/{saleId}
-     * @allow (get, list) - Any authenticated user can read sale data.
-     * @allow (create, update, delete) - Any authenticated user can write sale data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write purchase data, with authorization handled on the backend.
-     * @path /purchases/{purchaseId}
-     * @allow (get, list) - Any authenticated user can read purchase data.
-     * @allow (create, update, delete) - Any authenticated user can write purchase data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /purchases/{purchaseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write receipt data, with authorization handled on the backend.
-     * @path /receipts/{receiptId}
-     * @allow (get, list) - Any authenticated user can read receipt data.
-     * @allow (create, update, delete) - Any authenticated user can write receipt data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /receipts/{receiptId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write expense data, with authorization handled on the backend.
-     * @path /expenses/{expenseId}
-     * @allow (get, list) - Any authenticated user can read expense data.
-     * @allow (create, update, delete) - Any authenticated user can write expense data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /expenses/{expenseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    /**
-     * @description Allows any authenticated user to read or write export data, with authorization handled on the backend.
-     * @path /exports/{exportId}
-     * @allow (get, list) - Any authenticated user can read export data.
-     * @allow (create, update, delete) - Any authenticated user can write export data, subject to backend authorization.
-     * @deny (create, update, delete) - Not authenticated user cannot write client data.
-     * @principle Authenticated users have read access, write access control managed on the backend.
-     */
-    match /exports/{exportId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Generic read rule for all collections
+    match /{collection}/{document} {
+        allow get, list: if isSignedIn();
+    }
+
+    // Generic write rule for all collections, override for specific collections below
+    match /{collection}/{document} {
+        allow create, update, delete: if isSignedIn();
+    }
+
+    // Override generic rule for financial_transactions
+    match /financial_transactions/{document} {
+        allow get, list, create, update, delete: if false;
     }
   }
 }

@@ -173,13 +173,13 @@ export default function ReportGenerator() {
           };
         });
 
-        // const contextString = `
-        //     Report Request: ${values.analysisRequest}
-        //     Transactions: ${JSON.stringify(serializableTransactions, null, 2)}
-        // `;
+        const contextString = `
+            Report Request: ${values.analysisRequest}
+            Transactions: ${JSON.stringify(serializableTransactions, null, 2)}
+        `;
 
-        // const result = await generateReport(contextString);
-        setGeneratedAnalysis("AI analysis is temporarily disabled.");
+        const result = await generateReport(contextString);
+        setGeneratedAnalysis(result);
         toast({ title: 'AI Analysis Complete', description: 'Review the generated analysis below.' });
 
       } catch (error) {
@@ -231,7 +231,7 @@ export default function ReportGenerator() {
           <CardHeader>
             <CardTitle>Generate Financial Report</CardTitle>
             <CardDescription>
-             (Feature temporarily disabled) Select a date range and provide a title for your PDF report. You can also generate an AI-powered analysis to include in the report.
+              Select a date range and provide a title for your PDF report. You can also generate an AI-powered analysis to include in the report.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -245,7 +245,6 @@ export default function ReportGenerator() {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
-                          disabled
                           variant={'outline'}
                           className={cn(
                             'w-full justify-start text-left font-normal md:w-1/2',
@@ -291,7 +290,6 @@ export default function ReportGenerator() {
                   <FormLabel>Report Title</FormLabel>
                   <FormControl>
                     <Input
-                      disabled
                       placeholder="e.g., Q4 Financial Summary"
                       {...field}
                     />
@@ -312,7 +310,6 @@ export default function ReportGenerator() {
                   <FormLabel>AI Analysis Request</FormLabel>
                   <FormControl>
                     <Textarea
-                      disabled
                       placeholder="e.g., Provide a summary of income vs expenses and identify top spending categories."
                       {...field}
                     />
@@ -338,11 +335,11 @@ export default function ReportGenerator() {
 
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={form.handleSubmit(handleAiAnalysis)} disabled>
+            <Button type="button" variant="outline" onClick={form.handleSubmit(handleAiAnalysis)} disabled={isAiPending}>
                 {isAiPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
                 Generate AI Analysis
             </Button>
-            <Button type="submit" disabled>
+            <Button type="submit" disabled={isPdfPending}>
               {isPdfPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Generate PDF Report
             </Button>
