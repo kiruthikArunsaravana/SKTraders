@@ -36,8 +36,7 @@ import type { FinancialTransaction } from '@/lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { getTransactionsForDateRange } from './actions';
 
 
 const reportSchema = z.object({
@@ -58,7 +57,6 @@ type PdfGenerationData = {
 
 export default function ReportGenerator() {
   const { toast } = useToast();
-  const firestore = useFirestore();
   const [isPdfPending, setPdfPending] = useState(false);
 
   const form = useForm<z.infer<typeof reportSchema>>({
@@ -67,40 +65,6 @@ export default function ReportGenerator() {
       reportTitle: 'Monthly Financial Summary',
     },
   });
-
-  async function getTransactionsForDateRange(dateRange: {
-    from: Date;
-    to: Date;
-  }): Promise<FinancialTransaction[]> {
-    const { from, to } = dateRange;
-    to.setHours(23, 59, 59, 999); // Ensure the end of the day is included
-    
-    if (!firestore) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
-      return [];
-    }
-    
-    // const transactionsRef = collection(firestore, 'financial_transactions');
-    // const q = query(transactionsRef,
-    //   where('date', '>=', Timestamp.fromDate(from)),
-    //   where('date', '<=', Timestamp.fromDate(to))
-    // );
-  
-    try {
-      // const querySnapshot = await getDocs(q);
-      // return querySnapshot.docs.map(doc => ({
-      //   id: doc.id,
-      //   ...doc.data(),
-      //   date: (doc.data().date as Timestamp) // Ensure date is a Timestamp
-      // })) as FinancialTransaction[];
-      return [];
-    } catch (error) {
-      console.error("Firestore Error (getTransactionsForDateRange):", error);
-      toast({ variant: 'destructive', title: 'Error fetching data', description: 'Could not retrieve transactions from the database.' });
-      return [];
-    }
-  }
-
 
   const generatePdf = async (data: PdfGenerationData) => {
     setPdfPending(true);
@@ -186,7 +150,7 @@ export default function ReportGenerator() {
       await generatePdf({
         title: values.reportTitle,
         dateRange: values.dateRange,
-        transactions,
+        transactions: transactions.map(t => ({...t, date: t.date.toDate()})) as any, // Convert server timestamps
       });
 
     } catch (error) {
