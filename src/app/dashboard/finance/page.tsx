@@ -91,46 +91,10 @@ export default function FinancePage() {
 
   const firestore = useFirestore();
 
-  // This query is causing the permission error. Removing it.
-  // const transactionsQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
-  // }, [firestore]);
   
-  // const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
   const allTransactions: FinancialTransaction[] = []; // Use empty array to prevent crashes
   const isAllTransactionsLoading = false;
   
-  const today = new Date();
-  const startOfToday = startOfDay(today);
-  const endOfToday = endOfDay(today);
-
-  // const todaysIncomeQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(
-  //     collection(firestore, 'financial_transactions'),
-  //     where('type', '==', 'income'),
-  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
-  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
-  //     orderBy('date', 'desc')
-  //   );
-  // }, [firestore, startOfToday, endOfToday]);
-
-  // const { data: todaysIncome, isLoading: isTodaysIncomeLoading } = useCollection<FinancialTransaction>(todaysIncomeQuery);
-
-  // const todaysExpensesQuery = useMemoFirebase(() => {
-  //   if (!firestore) return null;
-  //   return query(
-  //     collection(firestore, 'financial_transactions'),
-  //     where('type', '==', 'expense'),
-  //     where('date', '>=', Timestamp.fromDate(startOfToday)),
-  //     where('date', '<=', Timestamp.fromDate(endOfToday)),
-  //     orderBy('date', 'desc')
-  //   );
-  // }, [firestore, startOfToday, endOfToday]);
-
-  // const { data: todaysExpenses, isLoading: isTodaysExpensesLoading } = useCollection<FinancialTransaction>(todaysExpensesQuery);
-
   const processTransactionsForRange = (range: DateRange | undefined, trans: FinancialTransaction[] = []) => {
       if (!range?.from || !trans) {
         return { totalIncome: 0, totalExpenses: 0, netProfit: 0, dailyData: new Map(), transactions: [] };
@@ -242,7 +206,7 @@ export default function FinancePage() {
     });
 
     return { summary1: s1, summary2: s2, combinedChartData: chartData };
-  }, [allTransactions, dateRange1, dateRange2]);
+  }, [dateRange1, dateRange2, allTransactions]);
   
   const monthlySummary = useMemo(() => {
     return processTransactionsForRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }, allTransactions || []);
@@ -341,14 +305,14 @@ export default function FinancePage() {
         <h1 className="text-3xl font-headline">Finance Management</h1>
         <Dialog open={isAddEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button disabled>
               <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Financial Entry</DialogTitle>
-              <DialogDescription>Record a new income or expense transaction.</DialogDescription>
+              <DialogDescription>Record a new income or expense transaction. (This feature is temporarily disabled)</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddEntry}>
               <div className="space-y-4 py-4">
@@ -357,6 +321,7 @@ export default function FinancePage() {
                   name="type"
                   className="flex gap-4"
                   onValueChange={setEntryType}
+                  disabled
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="income" id="income" />
@@ -367,10 +332,10 @@ export default function FinancePage() {
                     <Label htmlFor="expense">Expense</Label>
                   </div>
                 </RadioGroup>
-                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
-                <Input id="description" name="description" placeholder="Description" required />
+                <Input id="amount" name="amount" type="number" placeholder="Amount" required disabled />
+                <Input id="description" name="description" placeholder="Description" required disabled />
                 {entryType === 'expense' ? (
-                  <Select name="category" required>
+                  <Select name="category" required disabled>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
@@ -383,7 +348,7 @@ export default function FinancePage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Select name="category" required>
+                  <Select name="category" required disabled>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a product" />
                     </SelectTrigger>
@@ -401,6 +366,7 @@ export default function FinancePage() {
                     <Button
                       variant={'outline'}
                       className={cn('w-full justify-start text-left font-normal')}
+                      disabled
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {entryDate ? format(entryDate, 'PPP') : <span>Pick a date</span>}
@@ -412,7 +378,7 @@ export default function FinancePage() {
                 </Popover>
               </div>
               <DialogFooter>
-                <Button type="submit">Add Entry</Button>
+                <Button type="submit" disabled>Add Entry</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -716,5 +682,3 @@ export default function FinancePage() {
     </div>
   );
 }
-
-    
