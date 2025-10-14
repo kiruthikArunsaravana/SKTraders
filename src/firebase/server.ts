@@ -14,10 +14,21 @@ const getApp = (): App => {
     return getApps()[0];
   }
 
-  return initializeApp({
-    credential: cert(serviceAccount),
-    projectId: firebaseConfig.projectId,
-  });
+  // Conditionally use credentials only if the service account is available.
+  // In some environments (like local development without the env var),
+  // the SDK can initialize without explicit credentials.
+  if (serviceAccount) {
+    return initializeApp({
+      credential: cert(serviceAccount),
+      projectId: firebaseConfig.projectId,
+    });
+  } else {
+    // Initialize without credentials. This might rely on Application Default Credentials
+    // in some environments.
+    return initializeApp({
+      projectId: firebaseConfig.projectId,
+    });
+  }
 };
 
 export const getDb = () => {
