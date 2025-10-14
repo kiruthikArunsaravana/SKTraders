@@ -50,6 +50,13 @@ const reportSchema = z.object({
   }),
 });
 
+type ServerFinancialTransaction = Omit<FinancialTransaction, 'date'> & {
+    date: {
+        _seconds: number;
+        _nanoseconds: number;
+    }
+}
+
 type ClientFinancialTransaction = Omit<FinancialTransaction, 'date'> & {
     date: Date;
 };
@@ -142,7 +149,7 @@ export default function ReportGenerator() {
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setPdfPending(true);
     try {
-      const rawTransactions = await getTransactionsForDateRange(values.dateRange);
+      const rawTransactions = await getTransactionsForDateRange(values.dateRange) as ServerFinancialTransaction[];
       
       if (rawTransactions.length === 0) {
         toast({
@@ -156,7 +163,7 @@ export default function ReportGenerator() {
       
       const transactions: ClientFinancialTransaction[] = rawTransactions.map(t => ({
         ...t,
-        date: new Timestamp(t.date.seconds, t.date.nanoseconds).toDate(),
+        date: new Date(t.date._seconds * 1000),
       }));
 
       await generatePdf({
