@@ -1,6 +1,6 @@
 'use server';
 import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { firebaseConfig } from './config';
 
 // IMPORTANT: The service account key is sourced from an environment variable.
@@ -10,27 +10,25 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
   : undefined;
 
-const getApp = (): App => {
-  if (getApps().length) {
-    return getApps()[0];
-  }
+let adminApp: App;
 
-  // Conditionally use credentials only if the service account is available.
-  // In some environments (like local development without the env var),
-  // the SDK can initialize without explicit credentials.
+if (!getApps().length) {
   if (serviceAccount) {
-    return initializeApp({
+    adminApp = initializeApp({
       credential: cert(serviceAccount),
       projectId: firebaseConfig.projectId,
     });
+  } else {
+    // This error will be thrown if the service account is not available in the environment.
+    // In a deployed App Hosting environment, this should be provided automatically.
+    // For local development, you must set the FIREBASE_SERVICE_ACCOUNT environment variable.
+    throw new Error('Firebase Admin SDK service account credentials not found in environment variables.');
   }
-  
-  // When running locally, you must provide a service account via the
-  // FIREBASE_SERVICE_ACCOUNT environment variable.
-  // In a deployed environment (like App Hosting), this is provided automatically.
-  throw new Error('Firebase Admin SDK service account credentials not found in environment variables.');
-};
+} else {
+  adminApp = getApps()[0];
+}
 
-export const getDb = async () => {
-  return getFirestore(getApp());
+
+export async function getDb() {
+  return getFirestore(adminApp);
 };

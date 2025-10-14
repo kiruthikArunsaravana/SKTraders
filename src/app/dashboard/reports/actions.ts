@@ -2,7 +2,7 @@
 
 import { getDb } from '@/firebase/server';
 import { FinancialTransaction } from '@/lib/types';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp }from 'firebase-admin/firestore';
 
 
 export async function getTransactionsForDateRange(dateRange: {
@@ -23,11 +23,11 @@ export async function getTransactionsForDateRange(dateRange: {
     const querySnapshot = await q.get();
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
-      // The data from the Admin SDK returns a Timestamp object that is serializable.
-      // The client will need to convert it back to a Date object.
+      // The data from the Admin SDK returns a Timestamp object that needs to be
+      // serialized properly for the client. The client will handle conversion.
       return {
         id: doc.id,
-        ...data
+        ...data,
       } as FinancialTransaction;
     });
   } catch (error) {
