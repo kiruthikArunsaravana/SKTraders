@@ -39,6 +39,8 @@ import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
 import { generateReport } from '@/ai/flows/generate-report';
 import { Textarea } from '../ui/textarea';
+import { Timestamp } from 'firebase/firestore';
+
 
 const reportSchema = z.object({
   reportTitle: z.string().min(5, {
@@ -51,10 +53,14 @@ const reportSchema = z.object({
   analysisRequest: z.string().optional(),
 });
 
+type ClientFinancialTransaction = Omit<FinancialTransaction, 'date'> & {
+    date: Date;
+};
+
 type PdfGenerationData = {
   title: string;
   dateRange: { from: Date; to: Date };
-  transactions: FinancialTransaction[];
+  transactions: ClientFinancialTransaction[];
   analysis?: string;
 };
 
@@ -123,10 +129,8 @@ export default function ReportGenerator() {
     finalY += 12;
 
     const tableData = transactions.map(t => {
-      // Ensure date is a Date object before formatting
-      const date = t.date instanceof Date ? t.date : t.date.toDate();
       return [
-        format(date, 'yyyy-MM-dd'),
+        format(t.date, 'yyyy-MM-dd'),
         t.description,
         t.category,
         t.type.charAt(0).toUpperCase() + t.type.slice(1),
@@ -166,7 +170,8 @@ export default function ReportGenerator() {
         }
 
         const serializableTransactions = transactions.map(t => {
-          const date = t.date instanceof Date ? t.date : t.date.toDate();
+          // The date from the server action is an object, not a Timestamp instance
+          const date = new Timestamp(t.date.seconds, t.date.nanoseconds).toDate();
           return {
             ...t,
             date: date.toISOString(), // Convert to string
@@ -193,9 +198,10 @@ export default function ReportGenerator() {
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setPdfPending(true);
     try {
-      const transactions = await getTransactionsForDateRange(values.dateRange);
+      // Fetch raw transactions from the server action
+      const rawTransactions = await getTransactionsForDateRange(values.dateRange);
       
-      if (transactions.length === 0) {
+      if (rawTransactions.length === 0) {
         toast({
           variant: 'destructive',
           title: 'No Data Found',
@@ -205,6 +211,12 @@ export default function ReportGenerator() {
         return;
       }
       
+      // Convert Firestore Timestamps to JS Dates
+      const transactions: ClientFinancialTransaction[] = rawTransactions.map(t => ({
+        ...t,
+        date: new Timestamp(t.date.seconds, t.date.nanoseconds).toDate(),
+      }));
+
       await generatePdf({
         title: values.reportTitle,
         dateRange: values.dateRange,
@@ -219,7 +231,8 @@ export default function ReportGenerator() {
         title: 'Error Generating Report',
         description: 'An unexpected error occurred. Please try again.',
       });
-      setPdfPending(false);
+    } finally {
+        setPdfPending(false);
     }
   }
 

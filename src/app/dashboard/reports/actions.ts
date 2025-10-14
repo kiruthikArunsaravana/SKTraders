@@ -23,14 +23,11 @@ export async function getTransactionsForDateRange(dateRange: {
     const querySnapshot = await q.get();
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
-      // The data from the Admin SDK already has Timestamps that work with toDate()
+      // The data from the Admin SDK returns a Timestamp object that is serializable.
+      // The client will need to convert it back to a Date object.
       return {
         id: doc.id,
-        type: data.type,
-        amount: data.amount,
-        description: data.description,
-        date: data.date,
-        category: data.category,
+        ...data
       } as FinancialTransaction;
     });
   } catch (error) {
