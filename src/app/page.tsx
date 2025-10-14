@@ -2,9 +2,8 @@
 
 import { useState, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth, useUser } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +29,7 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLogin = (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!auth) {
       toast({
@@ -49,17 +48,41 @@ export default function LoginPage() {
           title: 'Login Successful',
           description: 'Redirecting you to the dashboard...',
         });
-        // The useEffect will handle the redirect
       })
-      .catch((error: any) => {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Invalid credentials. Please check your email and password or sign up.",
-        });
-      })
-      .finally(() => {
-        setIsSigningIn(false);
+      .catch((signInError: any) => {
+        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+          if (password.length < 6) {
+              toast({
+                  variant: "destructive",
+                  title: "Password Too Short",
+                  description: "Your password must be at least 6 characters long.",
+              });
+              setIsSigningIn(false);
+              return;
+          }
+          createUserWithEmailAndPassword(auth, email, password)
+            .then(() => {
+              toast({
+                title: 'Account Created & Logged In',
+                description: 'Welcome! Redirecting you to the dashboard...',
+              });
+            })
+            .catch((signUpError: any) => {
+              toast({
+                variant: "destructive",
+                title: "Sign Up Failed",
+                description: signUpError.message || "Could not create your account.",
+              });
+              setIsSigningIn(false);
+            });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: signInError.message || "An unknown error occurred.",
+          });
+          setIsSigningIn(false);
+        }
       });
   };
   
@@ -78,10 +101,10 @@ export default function LoginPage() {
           <div className="grid gap-2 text-center">
             <h1 className="text-3xl font-bold font-headline">HuskTrack Login</h1>
             <p className="text-balance text-muted-foreground">
-              Enter your credentials to access the SK Traders dashboard.
+              Enter your credentials to access or create an account.
             </p>
           </div>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleSubmit}>
             <div className="grid gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
@@ -107,16 +130,10 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isSigningIn}>
-                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
+                {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In or Sign Up'}
               </Button>
             </div>
           </form>
-           <div className="mt-4 text-center text-sm">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="underline">
-              Sign up
-            </Link>
-          </div>
         </div>
       </div>
       <div className="hidden bg-muted lg:block">
