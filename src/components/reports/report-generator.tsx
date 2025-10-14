@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, isWithinInterval } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,12 +32,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
-import { getTransactionsForDateRange } from '@/app/dashboard/reports/actions';
 import type { FinancialTransaction } from '@/lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
-import { Timestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 
 
 const reportSchema = z.object({
@@ -50,26 +50,16 @@ const reportSchema = z.object({
   }),
 });
 
-type ServerFinancialTransaction = Omit<FinancialTransaction, 'date'> & {
-    date: {
-        _seconds: number;
-        _nanoseconds: number;
-    }
-}
-
-type ClientFinancialTransaction = Omit<FinancialTransaction, 'date'> & {
-    date: Date;
-};
-
 type PdfGenerationData = {
   title: string;
   dateRange: { from: Date; to: Date };
-  transactions: ClientFinancialTransaction[];
+  transactions: FinancialTransaction[];
 };
 
 export default function ReportGenerator() {
   const { toast } = useToast();
   const [isPdfPending, setPdfPending] = useState(false);
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof reportSchema>>({
     resolver: zodResolver(reportSchema),
@@ -78,10 +68,27 @@ export default function ReportGenerator() {
     },
   });
 
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
+  }, [firestore]);
+
+  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+
   const generatePdf = async (data: PdfGenerationData) => {
     setPdfPending(true);
     const { title, dateRange, transactions } = data;
     
+    if (transactions.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Data Found',
+        description: 'There are no transactions in the selected date range to generate a report.',
+      });
+      setPdfPending(false);
+      return;
+    }
+
     const doc = new jsPDF();
 
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -118,7 +125,8 @@ export default function ReportGenerator() {
 
     const tableData = transactions.map(t => {
       return [
-        format(t.date, 'yyyy-MM-dd'),
+        // Ensure date is a Date object before formatting
+        format(t.date instanceof Timestamp ? t.date.toDate() : t.date, 'yyyy-MM-dd'),
         t.description,
         t.category,
         t.type.charAt(0).toUpperCase() + t.type.slice(1),
@@ -148,40 +156,29 @@ export default function ReportGenerator() {
 
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setPdfPending(true);
-    try {
-      const rawTransactions = await getTransactionsForDateRange(values.dateRange) as ServerFinancialTransaction[];
-      
-      if (rawTransactions.length === 0) {
-        toast({
-          variant: 'destructive',
-          title: 'No Data Found',
-          description: 'There are no transactions in the selected date range to generate a report.',
-        });
-        setPdfPending(false);
-        return;
-      }
-      
-      const transactions: ClientFinancialTransaction[] = rawTransactions.map(t => ({
-        ...t,
-        date: new Date(t.date._seconds * 1000),
-      }));
-
-      await generatePdf({
-        title: values.reportTitle,
-        dateRange: values.dateRange,
-        transactions,
-      });
-
-    } catch (error) {
-      console.error("Failed to generate report:", error);
-      toast({
+    
+    if (!allTransactions) {
+       toast({
         variant: 'destructive',
-        title: 'Error Generating Report',
-        description: 'An unexpected error occurred. Please try again.',
+        title: 'Data not loaded',
+        description: 'Transaction data is still loading, please try again in a moment.',
       });
-    } finally {
-        setPdfPending(false);
+      setPdfPending(false);
+      return;
     }
+
+    const filteredTransactions = allTransactions.filter(t => {
+        const transactionDate = t.date.toDate();
+        return isWithinInterval(transactionDate, { start: values.dateRange.from, end: values.dateRange.to });
+    });
+
+    await generatePdf({
+      title: values.reportTitle,
+      dateRange: values.dateRange,
+      transactions: filteredTransactions,
+    });
+    
+    setPdfPending(false);
   }
 
 
@@ -264,8 +261,8 @@ export default function ReportGenerator() {
             />
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="submit" disabled={isPdfPending}>
-              {isPdfPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            <Button type="submit" disabled={isPdfPending || isLoadingTransactions}>
+              {isPdfPending || isLoadingTransactions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Generate PDF Report
             </Button>
           </CardFooter>
