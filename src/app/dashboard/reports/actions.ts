@@ -1,9 +1,7 @@
 'use server';
 
-import { getDb } from '@/firebase/server';
+import { db, Timestamp } from '@/firebase/server';
 import { FinancialTransaction } from '@/lib/types';
-import { Timestamp }from 'firebase-admin/firestore';
-
 
 export async function getTransactionsForDateRange(dateRange: {
   from: Date;
@@ -12,9 +10,7 @@ export async function getTransactionsForDateRange(dateRange: {
   const { from, to } = dateRange;
   to.setHours(23, 59, 59, 999); // Ensure the end of the day is included
 
-  const firestore = await getDb();
-
-  const transactionsRef = firestore.collection('financial_transactions');
+  const transactionsRef = db.collection('financial_transactions');
   const q = transactionsRef
     .where('date', '>=', Timestamp.fromDate(from))
     .where('date', '<=', Timestamp.fromDate(to));
