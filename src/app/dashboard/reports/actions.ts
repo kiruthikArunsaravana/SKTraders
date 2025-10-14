@@ -12,7 +12,7 @@ export async function getTransactionsForDateRange(dateRange: {
   const { from, to } = dateRange;
   to.setHours(23, 59, 59, 999); // Ensure the end of the day is included
 
-  const firestore = getDb();
+  const firestore = await getDb();
 
   const transactionsRef = firestore.collection('financial_transactions');
   const q = transactionsRef
