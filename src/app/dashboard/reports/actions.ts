@@ -8,20 +8,26 @@ import { FinancialTransaction } from '@/lib/types';
 let app: App;
 if (!getApps().length) {
   try {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT!);
-      app = initializeApp({
-        credential: cert(serviceAccount),
-      });
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!serviceAccountString) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
+    }
+    const serviceAccount = JSON.parse(serviceAccountString);
+    app = initializeApp({
+      credential: cert(serviceAccount),
+    });
   } catch (e) {
     console.error('Failed to initialize Firebase Admin SDK:', e);
-    // Fallback for environments without service account JSON (like local dev with ADC)
-    app = initializeApp();
+    // In a production environment, you might want to re-throw the error
+    // or handle it in a way that doesn't prevent the app from starting if possible.
+    // For now, we'll log it, and subsequent DB calls will fail.
   }
 } else {
   app = getApps()[0];
 }
 
 const db = getFirestore(app);
+
 
 export async function getTransactionsForDateRange(dateRange: {
   from: Date;
