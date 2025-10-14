@@ -6,6 +6,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import type { Client, Export, Product } from '@/lib/types';
 import { initialProducts } from '@/lib/data';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function DashboardCards() {
@@ -16,24 +17,24 @@ export default function DashboardCards() {
     return query(collection(firestore, 'clients'));
   }, [firestore]);
 
-  const { data: clients } = useCollection<Client>(clientsQuery);
+  const { data: clients, isLoading: isClientsLoading } = useCollection<Client>(clientsQuery);
   
   const exportsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'exports'));
   }, [firestore]);
   
-  const { data: exports } = useCollection<Export>(exportsQuery);
+  const { data: exports, isLoading: isExportsLoading } = useCollection<Export>(exportsQuery);
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'products'));
   }, [firestore]);
 
-  const { data: products } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
+  const { data: products, isLoading: isProductsLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
 
   const totalClients = clients?.length ?? 0;
-  const totalExportValue = exports?.reduce((sum, e) => sum + e.quantity, 0) ?? 0;
+  const totalExportValue = exports?.reduce((sum, e) => sum + Number(e.quantity || 0), 0) ?? 0;
   
   const productsWithIcons = useMemo(() => {
     const productMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
@@ -48,7 +49,9 @@ export default function DashboardCards() {
     return Array.from(productMap.values());
   }, [products]);
 
-  const totalStock = productsWithIcons.reduce((sum, p) => sum + p.quantity, 0);
+  const totalStock = productsWithIcons.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
+  
+  const isLoading = isClientsLoading || isExportsLoading || isProductsLoading;
 
   const cards = [
     {
@@ -65,11 +68,21 @@ export default function DashboardCards() {
     },
     {
       title: 'Total Export Value',
-      value: `$${totalExportValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: `$${totalExportValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
       change: 'All time',
       icon: Ship,
     },
   ];
+
+  if (isLoading) {
+    return (
+        <>
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+        </>
+    )
+  }
 
   return (
     <>
