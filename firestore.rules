@@ -1,143 +1,131 @@
 /**
- * @file Firestore Security Rules for SK Traders
- * @core_philosophy This ruleset provides basic protection for SK Traders' Firestore data.
- * All data is stored in top-level collections, with access primarily controlled on the backend.
- * @data_structure The database consists of the following top-level collections: clients, products, stocks, sales, purchases, receipts, expenses, and exports.
- * @key_security_decisions Role-based access control is managed on the backend, simplifying Firestore Security Rules.
- * No authorization context is denormalized into subcollections.
+ * @fileoverview Firestore Security Rules for SK Traders App.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes simplicity by delegating authorization to the backend, using Spring Security.
+ * All collections are accessible for read and write operations, while role-based access control is managed on the server-side,
+ * eliminating the need for complex security rules or data denormalization within Firestore.
+ *
+ * Data Structure:
+ * The database consists of top-level collections for clients, products, stocks, sales, purchases, receipts, expenses, and exports.
+ * There are no user-specific subcollections.
+ *
+ * Key Security Decisions:
+ * - No user-specific security rules are enforced within Firestore.
+ * - Role-based access control is exclusively handled on the backend, ensuring a centralized and manageable security strategy.
+ * - All collections are accessible for read and write to any authenticated user, assuming that Spring Security will prevent unauthorized access.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Defines a global function to check if a user is signed in.
-     * @returns true if the user is authenticated, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the request is made by the owner (user with matching UID).
-     * @param {string} userId - The user ID to check against.
-     * @returns true if the request.auth.uid matches the provided userId, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the request is made by the owner and the document exists.
-     * @param {string} userId - The user ID to check against.
-     * @returns true if the request.auth.uid matches the provided userId and the document exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /clients collection.
+     * @description Manages access to client data. All authenticated users can read and write client documents.
      * @path /clients/{clientId}
-     * @allow (get, list): Allows any signed-in user to read client data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects client data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list client documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete client documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /clients/{clientId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /products collection.
+     * @description Manages access to product data. All authenticated users can read and write product documents.
      * @path /products/{productId}
-     * @allow (get, list): Allows any signed-in user to read product data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects product data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list product documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete product documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /products/{productId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /stocks collection.
+     * @description Manages access to stock data. All authenticated users can read and write stock documents.
      * @path /stocks/{stockId}
-     * @allow (get, list): Allows any signed-in user to read stock data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects stock data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list stock documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete stock documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /stocks/{stockId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /sales collection.
+     * @description Manages access to sale data. All authenticated users can read and write sale documents.
      * @path /sales/{saleId}
-     * @allow (get, list): Allows any signed-in user to read sales data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects sales data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list sale documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete sale documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /sales/{saleId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /purchases collection.
+     * @description Manages access to purchase data. All authenticated users can read and write purchase documents.
      * @path /purchases/{purchaseId}
-     * @allow (get, list): Allows any signed-in user to read purchases data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects purchase data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list purchase documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete purchase documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /purchases/{purchaseId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /receipts collection.
+     * @description Manages access to receipt data. All authenticated users can read and write receipt documents.
      * @path /receipts/{receiptId}
-     * @allow (get, list): Allows any signed-in user to read receipts data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects receipts data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list receipt documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete receipt documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /receipts/{receiptId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /expenses collection.
+     * @description Manages access to expense data. All authenticated users can read and write expense documents.
      * @path /expenses/{expenseId}
-     * @allow (get, list): Allows any signed-in user to read expenses data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects expenses data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list expense documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete expense documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /expenses/{expenseId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /exports collection.
+     * @description Manages access to export data. All authenticated users can read and write export documents.
      * @path /exports/{exportId}
-     * @allow (get, list): Allows any signed-in user to read exports data.
-     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
-     * @deny (create) Request without authentication.
-     * @principle Protects exports data with basic authentication.
+     * @allow (get, list) All authenticated users can retrieve and list export documents.
+     * @allow (create, update, delete) All authenticated users can create, update, and delete export documents.
+     * @deny None. Access control is managed on the backend.
+     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
      */
     match /exports/{exportId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
     }
   }
 }
