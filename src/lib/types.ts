@@ -1,3 +1,4 @@
+'use client';
 import type { LucideIcon } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 
@@ -38,7 +39,7 @@ export type Export = {
   productId: string;
   destinationCountry: string;
   destinationPort: string;
-  quantity: number; // This is the value
+  quantity: number;
   exportDate: Timestamp;
   status: ExportStatus;
   invoiceNumber: string;

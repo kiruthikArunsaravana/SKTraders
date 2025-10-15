@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,10 +17,10 @@ import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import type { Export, ExportStatus } from '@/lib/types';
+import type { Export, ExportStatus, Client, Product } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp, doc } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -33,6 +33,9 @@ export default function ExportsPage() {
   const [selectedExport, setSelectedExport] = useState<Export | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [statusFilter, setStatusFilter] = useState<ExportStatus | 'all'>('all');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [destinationCountry, setDestinationCountry] = useState('');
+
 
   const firestore = useFirestore();
 
@@ -41,27 +44,49 @@ export default function ExportsPage() {
     return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
   }, [firestore]);
 
-  const { data: exports, isLoading } = useCollection<Export>(exportsQuery);
+  const internationalClientsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'clients'), where('clientType', '==', 'international'));
+  }, [firestore]);
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'));
+  }, [firestore]);
+
+  const { data: exports, isLoading: isLoadingExports } = useCollection<Export>(exportsQuery);
+  const { data: internationalClients, isLoading: isLoadingClients } = useCollection<Client>(internationalClientsQuery);
+  const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  const productsMap = useMemo(() => {
+    if (!products) return new Map<string, Product>();
+    return new Map(products.map(p => [p.id, p]));
+  }, [products]);
+
+  useEffect(() => {
+    if (selectedClientId && internationalClients) {
+      const client = internationalClients.find(c => c.id === selectedClientId);
+      if (client) {
+        setDestinationCountry(client.country);
+      }
+    } else {
+      setDestinationCountry('');
+    }
+  }, [selectedClientId, internationalClients]);
 
   const filteredExports = useMemo(() => {
     if (!exports) return [];
     
     return exports.filter(exp => {
-      // Date range filter
       const isInDateRange = (() => {
-        if (!dateRange?.from) return true; // No start date, include all
+        if (!dateRange?.from) return true;
         const from = dateRange.from;
-        // If no end date, use start date for a single day filter
         const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
-        
-        // Adjust 'to' date to include the entire day
         to.setHours(23, 59, 59, 999);
-        
         const expDate = exp.exportDate.toDate();
         return isWithinInterval(expDate, { start: from, end: to });
       })();
 
-      // Status filter
       const hasStatus = statusFilter === 'all' || exp.status === statusFilter;
       
       return isInDateRange && hasStatus;
@@ -82,36 +107,47 @@ export default function ExportsPage() {
 
     const formData = new FormData(event.currentTarget);
     const clientId = formData.get('clientId') as string;
-    const destinationCountry = formData.get('destinationCountry') as string;
+    const country = formData.get('destinationCountry') as string;
     const destinationPort = formData.get('destinationPort') as string;
     const quantity = parseFloat(formData.get('quantity') as string);
     const status = formData.get('status') as ExportStatus;
     const invoiceNumber = formData.get('invoiceNumber') as string;
+    const productId = 'coco-pith'; // Defaulting for now
     
-    if (!clientId || !destinationCountry || !destinationPort || !quantity || !status || !invoiceNumber) {
+    if (!clientId || !country || !destinationPort || !quantity || !status || !invoiceNumber) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
+
+    const product = productsMap.get(productId);
+    if (!product || product.quantity < quantity) {
+      toast({ variant: 'destructive', title: 'Stock Alert', description: 'There is only less stocks verify again' });
+      return;
+    }
     
+    const client = internationalClients?.find(c => c.id === clientId);
+
     const exportsCollection = collection(firestore, 'exports');
     const newExportData = {
-      clientId,
-      destinationCountry,
+      clientId: client?.companyName || clientId,
+      destinationCountry: country,
       destinationPort,
       quantity,
       exportDate: Timestamp.now(),
       status,
       invoiceNumber,
-      productId: 'coco-pith', // Defaulting to coco-pith for now
+      productId,
     };
     
     addDocumentNonBlocking(exportsCollection, newExportData);
 
     setAddDialogOpen(false);
     (event.target as HTMLFormElement).reset();
+    setSelectedClientId('');
+    setDestinationCountry('');
     toast({
       title: "Export Order Added",
-      description: `Order for ${clientId} has been successfully added.`,
+      description: `Order for ${newExportData.clientId} has been successfully added.`,
     });
   }
 
@@ -122,22 +158,56 @@ export default function ExportsPage() {
         return;
     }
     const formData = new FormData(event.currentTarget);
-    const status = formData.get('status') as ExportStatus;
+    const newStatus = formData.get('status') as ExportStatus;
 
-    if (!status) {
+    if (!newStatus) {
         toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a status.' });
         return;
     }
 
     const exportRef = doc(firestore, 'exports', selectedExport.id);
-    updateDocumentNonBlocking(exportRef, { status });
+
+    // If status is changing to 'Completed', update stock
+    if (newStatus === 'Completed' && selectedExport.status !== 'Completed') {
+      const productRef = doc(firestore, 'products', selectedExport.productId);
+      const product = productsMap.get(selectedExport.productId);
+      
+      if (!product || product.quantity < selectedExport.quantity) {
+        toast({ variant: 'destructive', title: 'Stock Alert', description: 'Cannot complete order, insufficient stock.' });
+        return;
+      }
+      
+      try {
+        await runTransaction(firestore, async (transaction) => {
+          const productDoc = await transaction.get(productRef);
+          if (!productDoc.exists()) {
+            throw "Product document does not exist!";
+          }
+          const newQuantity = productDoc.data().quantity - selectedExport.quantity;
+          transaction.update(productRef, { quantity: newQuantity });
+          transaction.update(exportRef, { status: newStatus });
+        });
+        
+        toast({
+            title: "Status Updated & Stock Reduced",
+            description: `Order status updated to "Completed" and stock has been adjusted.`,
+        });
+
+      } catch (error) {
+        console.error("Transaction failed: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status and stock.' });
+        return;
+      }
+    } else {
+       updateDocumentNonBlocking(exportRef, { status: newStatus });
+       toast({
+          title: "Status Updated",
+          description: `Order status has been updated to "${newStatus}".`,
+      });
+    }
 
     setEditDialogOpen(false);
     setSelectedExport(null);
-    toast({
-        title: "Status Updated",
-        description: `Order status has been updated to "${status}".`,
-    });
   };
 
   
@@ -175,12 +245,12 @@ export default function ExportsPage() {
       exp.destinationPort,
       format(exp.exportDate.toDate(), 'PP'),
       exp.status,
-      `$${exp.quantity.toLocaleString()}`
+      `${exp.quantity.toLocaleString()}`
     ]);
 
     autoTable(doc, {
       startY: 45,
-      head: [['Client', 'Country', 'Port', 'Date', 'Status', 'Value']],
+      head: [['Client', 'Country', 'Port', 'Date', 'Status', 'Quantity']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -189,7 +259,7 @@ export default function ExportsPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFont('PT Sans', 'bold');
     doc.setFontSize(14);
-    doc.text(`Total Export Value: $${totalValue.toLocaleString()}`, 14, finalY);
+    doc.text(`Total Export Quantity: ${totalValue.toLocaleString()}`, 14, finalY);
 
     doc.save(`HuskTrack-Export-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
@@ -207,6 +277,8 @@ export default function ExportsPage() {
         default: return 'outline';
     }
   }
+  
+  const isLoading = isLoadingExports || isLoadingClients || isLoadingProducts;
 
   return (
     <div className="space-y-6">
@@ -260,12 +332,22 @@ export default function ExportsPage() {
                 <form onSubmit={handleAddExportOrder}>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="clientId">Client ID</Label>
-                      <Input id="clientId" name="clientId" placeholder="e.g., Euro Garden Supplies" required />
+                        <Label htmlFor="clientId">Client</Label>
+                        <Select name="clientId" required onValueChange={setSelectedClientId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select an international client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {isLoadingClients ? <SelectItem value="loading" disabled>Loading clients...</SelectItem> :
+                                internationalClients?.map(client => (
+                                    <SelectItem key={client.id} value={client.id}>{client.companyName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="destinationCountry">Country</Label>
-                      <Input id="destinationCountry" name="destinationCountry" placeholder="e.g., Germany" required />
+                      <Input id="destinationCountry" name="destinationCountry" value={destinationCountry} onChange={(e) => setDestinationCountry(e.target.value)} placeholder="e.g., Germany" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="destinationPort">Port</Label>
@@ -289,8 +371,8 @@ export default function ExportsPage() {
                       <Input id="invoiceNumber" name="invoiceNumber" placeholder="INV-12345" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="quantity">Value ($)</Label>
-                      <Input id="quantity" name="quantity" type="number" placeholder="45000" required />
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <Input id="quantity" name="quantity" type="number" placeholder="5000" required />
                     </div>
                   </div>
                   <DialogFooter>
@@ -312,7 +394,7 @@ export default function ExportsPage() {
                 <TableHead className="hidden sm:table-cell">Destination</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="text-right">Value</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
                 <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
@@ -339,7 +421,7 @@ export default function ExportsPage() {
                       <Badge variant={statusBadgeVariant(exp.status)}>{exp.status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{format(exp.exportDate.toDate(), 'PP')}</TableCell>
-                    <TableCell className="text-right">${exp.quantity.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{exp.quantity.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedExport(exp); setEditDialogOpen(true); }}>
                             <Edit className="h-4 w-4" />
