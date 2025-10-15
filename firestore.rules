@@ -1,143 +1,135 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders.
- *
- * Core Philosophy:
- * This ruleset provides open access to all data.
- *
- * Data Structure:
- * The database consists of several top-level collections: `clients`, `products`, `stocks`, `sales`, `purchases`, `receipts`, `expenses`, and `exports`.
- *
- * Key Security Decisions:
- * All read and write operations are open. This is for prototyping purposes only and is not suitable for production.
- *
- * Denormalization for Authorization:
- * Not applicable, as all data is open.
- *
- * Structural Segregation:
- * Not applicable, as all collections are treated equally.
+ * @file Firestore Security Rules for SK Traders
+ * @core_philosophy This ruleset provides basic protection against unauthorized data access and modification.
+ * It is designed to work in conjunction with server-side role-based access control, which handles the actual authorization.
+ * All rules in this file are written to deny any operation that is not explicitly permitted by the server.
+ * @data_structure The database consists of top-level collections for clients, products, stock, sales, purchases, receipts, expenses, and exports.
+ * There is no user-specific data or subcollections.
+ * @key_security_decisions All data access is controlled on the server-side via Spring Security. Therefore, these rules primarily act as a fallback to prevent unauthorized direct access to Firestore. No rules are implemented that rely on request.auth information.
+ *  All write operations are denied by default.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows anyone to read or write client data.
+     * @description Controls access to the 'clients' collection.
      * @path /clients/{clientId}
-     * @allow (get) Any user can retrieve a client.
-     * @allow (list) Any user can list clients.
-     * @allow (create) Any user can create a client.
-     * @allow (update) Any user can update a client.
-     * @allow (delete) Any user can delete a client.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /clients/{clientId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write product data.
+     * @description Controls access to the 'products' collection.
      * @path /products/{productId}
-     * @allow (get) Any user can retrieve a product.
-     * @allow (list) Any user can list products.
-     * @allow (create) Any user can create a product.
-     * @allow (update) Any user can update a product.
-     * @allow (delete) Any user can delete a product.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /products/{productId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write stock data.
+     * @description Controls access to the 'stocks' collection.
      * @path /stocks/{stockId}
-     * @allow (get) Any user can retrieve stock information.
-     * @allow (list) Any user can list stock information.
-     * @allow (create) Any user can create stock information.
-     * @allow (update) Any user can update stock information.
-     * @allow (delete) Any user can delete stock information.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /stocks/{stockId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write sales data.
+     * @description Controls access to the 'sales' collection.
      * @path /sales/{saleId}
-     * @allow (get) Any user can retrieve sales data.
-     * @allow (list) Any user can list sales data.
-     * @allow (create) Any user can create sales data.
-     * @allow (update) Any user can update sales data.
-     * @allow (delete) Any user can delete sales data.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /sales/{saleId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write purchase data.
+     * @description Controls access to the 'purchases' collection.
      * @path /purchases/{purchaseId}
-     * @allow (get) Any user can retrieve purchase data.
-     * @allow (list) Any user can list purchase data.
-     * @allow (create) Any user can create purchase data.
-     * @allow (update) Any user can update purchase data.
-     * @allow (delete) Any user can delete purchase data.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write receipt data.
+     * @description Controls access to the 'receipts' collection.
      * @path /receipts/{receiptId}
-     * @allow (get) Any user can retrieve receipt data.
-     * @allow (list) Any user can list receipt data.
-     * @allow (create) Any user can create receipt data.
-     * @allow (update) Any user can update receipt data.
-     * @allow (delete) Any user can delete receipt data.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /receipts/{receiptId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write expense data.
+     * @description Controls access to the 'expenses' collection.
      * @path /expenses/{expenseId}
-     * @allow (get) Any user can retrieve expense data.
-     * @allow (list) Any user can list expense data.
-     * @allow (create) Any user can create expense data.
-     * @allow (update) Any user can update expense data.
-     * @allow (delete) Any user can delete expense data.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /expenses/{expenseId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows anyone to read or write export data.
+     * @description Controls access to the 'exports' collection.
      * @path /exports/{exportId}
-     * @allow (get) Any user can retrieve export data.
-     * @allow (list) Any user can list export data.
-     * @allow (create) Any user can create export data.
-     * @allow (update) Any user can update export data.
-     * @allow (delete) Any user can delete export data.
-     * @principle Open access for prototyping.
+     * @allow (get, list) - Always denied, access controlled by backend
+     * @deny (create, update, delete) - Always denied
+     * @principle Server-side access control. Prevents any client-side data modification.
      */
     match /exports/{exportId} {
-      allow get, list: if true;
-      allow create, update, delete: if true;
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
