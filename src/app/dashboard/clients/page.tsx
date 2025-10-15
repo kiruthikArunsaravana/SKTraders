@@ -16,6 +16,7 @@ import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ClientsPage() {
   const { toast } = useToast();
@@ -42,8 +43,9 @@ export default function ClientsPage() {
     const contactEmail = formData.get('contactEmail') as string;
     const companyName = formData.get('companyName') as string;
     const country = formData.get('country') as string;
+    const clientType = formData.get('clientType') as 'local' | 'international';
     
-    if (!contactName || !contactEmail || !companyName || !country) {
+    if (!contactName || !contactEmail || !companyName || !country || !clientType) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields.' });
        return;
     }
@@ -54,6 +56,7 @@ export default function ClientsPage() {
       contactEmail,
       companyName,
       country,
+      clientType,
       totalSales: 0,
       lastPurchaseDate: Timestamp.now(),
     };
@@ -99,6 +102,18 @@ export default function ClientsPage() {
                   <Label htmlFor="contactEmail">Contact Email</Label>
                   <Input id="contactEmail" name="contactEmail" type="email" placeholder="john@example.com" required />
                 </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="clientType">Client Type</Label>
+                  <Select name="clientType" required>
+                      <SelectTrigger>
+                          <SelectValue placeholder="Select client type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="local">Local</SelectItem>
+                          <SelectItem value="international">International</SelectItem>
+                      </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
                   <Input id="country" name="country" placeholder="USA" required />
@@ -121,6 +136,7 @@ export default function ClientsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Company</TableHead>
+                <TableHead className="hidden sm:table-cell">Client Type</TableHead>
                 <TableHead className="hidden md:table-cell">Contact</TableHead>
                 <TableHead className="hidden md:table-cell">Country</TableHead>
                 <TableHead className="hidden md:table-cell">Last Purchase</TableHead>
@@ -131,10 +147,10 @@ export default function ClientsPage() {
               {isLoading && (
                 <>
                   <TableRow>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 </>
               )}
@@ -142,6 +158,9 @@ export default function ClientsPage() {
                 <TableRow key={client.id}>
                   <TableCell>
                     <div className="font-medium">{client.companyName}</div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <Badge variant={client.clientType === 'international' ? 'default' : 'secondary'}>{client.clientType}</Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                      <div className="font-medium">{client.contactName}</div>
@@ -160,7 +179,7 @@ export default function ClientsPage() {
               ))}
                {!isLoading && (!clients || clients.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No clients found. Add one to get started.</TableCell>
+                  <TableCell colSpan={6} className="text-center">No clients found. Add one to get started.</TableCell>
                 </TableRow>
               )}
             </TableBody>

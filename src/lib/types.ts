@@ -9,6 +9,7 @@ export type Client = {
   totalSales: number;
   lastPurchaseDate: Timestamp;
   country: string;
+  clientType: 'local' | 'international';
 };
 
 export type Product = {

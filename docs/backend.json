@@ -40,23 +40,48 @@
           "type": "string",
           "description": "Unique identifier for the client entity."
         },
-        "name": {
+        "companyName": {
           "type": "string",
-          "description": "Client's name."
+          "description": "Client's company name."
         },
-        "contactInfo": {
+        "contactName": {
           "type": "string",
-          "description": "Client's contact information."
+          "description": "Client's contact name."
         },
-        "exportPreferences": {
+        "contactEmail": {
           "type": "string",
-          "description": "Client's export preferences."
+          "description": "Client's contact email.",
+          "format": "email"
+        },
+        "country": {
+          "type": "string",
+          "description": "Country of the client."
+        },
+        "clientType": {
+          "type": "string",
+          "description": "Type of client, can be local or international.",
+          "enum": [
+            "local",
+            "international"
+          ]
+        },
+        "totalSales": {
+          "type": "number",
+          "description": "Total sales amount for the client."
+        },
+        "lastPurchaseDate": {
+          "type": "string",
+          "description": "Last purchase date by the client.",
+          "format": "date-time"
         }
       },
       "required": [
         "id",
-        "name",
-        "contactInfo"
+        "companyName",
+        "contactName",
+        "contactEmail",
+        "country",
+        "clientType"
       ]
     },
     "Product": {
