@@ -103,12 +103,6 @@ export default function LocalSalesPage() {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
-
-    const product = productsMap.get(productId as any);
-    if (!product || product.quantity < quantity) {
-      toast({ variant: 'destructive', title: 'Stock Alert', description: 'There is only less stocks verify again' });
-      return;
-    }
     
     const client = localClients?.find(c => c.id === clientId);
     if (!client) {
@@ -166,7 +160,7 @@ export default function LocalSalesPage() {
 
           const currentQuantity = productDoc.data().quantity;
           if (currentQuantity < selectedSale.quantity) {
-             throw "Cannot complete sale, insufficient stock.";
+             throw `Cannot complete sale, insufficient stock. Only ${currentQuantity} units available.`;
           }
 
           const newQuantity = currentQuantity - selectedSale.quantity;
