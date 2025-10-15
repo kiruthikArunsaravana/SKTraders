@@ -126,6 +126,12 @@ export default function ReportGenerator() {
       .filter(t => t.type === 'expense' && t.category === 'Husk')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
+    const productSales: { [key: string]: number } = {};
+    [...localSales, ...exports].forEach(sale => {
+        const productName = productsMap.get(sale.productId)?.name || 'Unknown Product';
+        productSales[productName] = (productSales[productName] || 0) + sale.quantity;
+    });
+
 
     doc.setFont('Playfair Display', 'bold');
     doc.setFontSize(22);
@@ -163,6 +169,30 @@ export default function ReportGenerator() {
     });
     
     finalY = (doc as any).lastAutoTable.finalY + 10;
+    
+    // Products Sold Table
+    if (Object.keys(productSales).length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('Playfair Display', 'bold');
+        doc.text('Products Sold Summary', 14, finalY);
+        finalY += 8;
+
+        const productSalesTableData = Object.entries(productSales).map(([name, quantity]) => [
+            name,
+            quantity.toLocaleString()
+        ]);
+
+        autoTable(doc, {
+            startY: finalY,
+            head: [['Product Name', 'Total Quantity Sold']],
+            body: productSalesTableData,
+            theme: 'grid',
+            headStyles: { fillColor: [40, 50, 80] },
+        });
+
+        finalY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
 
     if(transactions.length > 0) {
         doc.setFontSize(16);
@@ -341,3 +371,5 @@ export default function ReportGenerator() {
     </Form>
   );
 }
+
+    
