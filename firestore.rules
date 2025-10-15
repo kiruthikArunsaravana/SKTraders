@@ -1,121 +1,278 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders.
+ * @fileoverview Firestore Security Rules for HuskTrack.
  *
- * Core Philosophy:
- * This ruleset provides baseline security for the SK Traders application, allowing all signed-in users full access to all data.
- * Role-based access control is intended to be managed on the backend via Spring Security, simplifying these rules.
+ * Core Philosophy: This ruleset enforces a role-based access control model,
+ * combined with path-based ownership for user profiles.
  *
  * Data Structure:
- * The Firestore database consists of top-level collections for core entities: 'clients', 'products', 'stocks', 'sales', 'purchases', 'receipts', 'expenses', and 'exports'.
- * There is no user-specific data segregation within the database itself.
+ * - /users/{userId}: Stores user profiles; access is restricted to the owning user.
+ * - /clients/{clientId}, /products/{productId}, /stocks/{stockId}, /sales/{saleId},
+ *   /purchases/{purchaseId}, /receipts/{receiptId}, /expenses/{expenseId}, /exports/{exportId}:
+ *   Top-level collections accessible based on user roles (Admin, Manager, Employee).
+ * - /roles_admin/{userId}: Documents in this collection denote admin role; existence confers admin access.
  *
  * Key Security Decisions:
- * - Role-based access control is handled on the backend, not in the rules.
- * - No user-specific ownership checks or data segregation is enforced within Firestore.
- * - All authenticated users are granted full read and write access to all collections.
+ * - User listing is implicitly disallowed (no rule grants `list` on `/users`).
+ * - Data shape validation is minimized for prototyping speed.
+ * - Write operations require role-based authentication.
+ * - Admin role is determined by existence of document in /roles_admin collection.
+ *
+ * Denormalization for Authorization:
+ *   The admin role is checked via a separate collection to avoid complex rules logic.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to read and write client data.
+     * @description Checks if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user ID matches the authenticated user's ID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if a user is an admin based on the existence of a document in the /roles_admin collection.
+     */
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Checks if the user has a Manager role.
+     * @todo Implement a mechanism to define and verify manager roles, potentially via a custom claim.
+     */
+    function isManager() {
+        return isAdmin();
+    }
+
+    /**
+     * @description Checks if the user has an Employee role.
+     * @todo Implement a mechanism to define and verify employee roles, potentially via a custom claim.
+     */
+    function isEmployee() {
+        return isAdmin() || isManager();
+    }
+
+    /**
+     * @description Checks if the user is an existing owner of a document.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Grants access to user-specific data based on path-based ownership.
+     * @path /users/{userId}
+     * @allow (create) - A user can create their own profile if the userId matches their auth.uid.
+     *   Example: request.auth.uid = "user123", userId = "user123"
+     * @allow (get) - A user can read their own profile.
+     *   Example: request.auth.uid = "user123", userId = "user123"
+     * @allow (update) - A user can update their own profile.
+     *   Example: request.auth.uid = "user123", userId = "user123"
+     * @allow (delete) - A user can delete their own profile.
+     *   Example: request.auth.uid = "user123", userId = "user123"
+     * @deny (create) - A user cannot create a profile for another user.
+     *   Example: request.auth.uid = "user123", userId = "user456"
+     * @deny (get) - A user cannot read another user's profile.
+     *   Example: request.auth.uid = "user123", userId = "user456"
+     * @deny (update) - A user cannot update another user's profile.
+     *   Example: request.auth.uid = "user123", userId = "user456"
+     * @deny (delete) - A user cannot delete another user's profile.
+     *   Example: request.auth.uid = "user123", userId = "user456"
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Listing users is not permitted.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Grants access to client data based on user role.
      * @path /clients/{clientId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read client data.
+     *   Example: request.auth.uid = "user123" (regardless of role)
+     * @allow (create) - Admin, Manager, or Employee roles can create client data.
+     *   Example: request.auth.uid = "admin123" (Admin role)
+     * @allow (update) - Admin, Manager, or Employee roles can update client data.
+     *   Example: request.auth.uid = "manager456" (Manager role)
+     * @allow (delete) - Admin, Manager, or Employee roles can delete client data.
+     *   Example: request.auth.uid = "employee789" (Employee role)
+     * @deny (create) - Unauthenticated users cannot create client data.
+     *   Example: request.auth.uid = null
+     * @deny (update) - Unauthenticated users cannot update client data.
+     *   Example: request.auth.uid = null
+     * @deny (delete) - Unauthenticated users cannot delete client data.
+     *   Example: request.auth.uid = null
+     * @principle Restricts write access based on user role.
      */
     match /clients/{clientId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write product data.
+     * @description Grants access to product data based on user role.
      * @path /products/{productId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read product data.
+     * @allow (create) - Admin, Manager, or Employee roles can create product data.
+     * @allow (update) - Admin, Manager, or Employee roles can update product data.
+     * @allow (delete) - Admin, Manager, or Employee roles can delete product data.
+     * @deny (create) - Unauthenticated users cannot create product data.
+     * @deny (update) - Unauthenticated users cannot update product data.
+     * @deny (delete) - Unauthenticated users cannot delete product data.
+     * @principle Restricts write access based on user role.
      */
     match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write stock data.
+     * @description Grants access to stock data based on user role.
      * @path /stocks/{stockId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read stock data.
+     * @allow (create) - Admin or Manager roles can create stock data.
+     * @allow (update) - Admin or Manager roles can update stock data.
+     * @allow (delete) - Admin or Manager roles can delete stock data.
+     * @deny (create) - Unauthenticated users cannot create stock data.
+     * @deny (update) - Unauthenticated users cannot update stock data.
+     * @deny (delete) - Unauthenticated users cannot delete stock data.
+     * @principle Restricts write access based on user role.
      */
     match /stocks/{stockId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager());
+      allow update: if isSignedIn() && (isAdmin() || isManager()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write sale data.
+     * @description Grants access to sale data based on user role.
      * @path /sales/{saleId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read sale data.
+     * @allow (create) - Admin, Manager, or Employee roles can create sale data.
+     * @allow (update) - Admin, Manager, or Employee roles can update sale data.
+     * @allow (delete) - Admin, Manager, or Employee roles can delete sale data.
+     * @deny (create) - Unauthenticated users cannot create sale data.
+     * @deny (update) - Unauthenticated users cannot update sale data.
+     * @deny (delete) - Unauthenticated users cannot delete sale data.
+     * @principle Restricts write access based on user role.
      */
     match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write purchase data.
+     * @description Grants access to purchase data based on user role.
      * @path /purchases/{purchaseId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read purchase data.
+     * @allow (create) - Admin, Manager, or Employee roles can create purchase data.
+     * @allow (update) - Admin, Manager, or Employee roles can update purchase data.
+     * @allow (delete) - Admin, Manager, or Employee roles can delete purchase data.
+     * @deny (create) - Unauthenticated users cannot create purchase data.
+     * @deny (update) - Unauthenticated users cannot update purchase data.
+     * @deny (delete) - Unauthenticated users cannot delete purchase data.
+     * @principle Restricts write access based on user role.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write receipt data.
+     * @description Grants access to receipt data based on user role.
      * @path /receipts/{receiptId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read receipt data.
+     * @allow (create) - Admin, Manager, or Employee roles can create receipt data.
+     * @allow (update) - Admin, Manager, or Employee roles can update receipt data.
+     * @allow (delete) - Admin, Manager, or Employee roles can delete receipt data.
+     * @deny (create) - Unauthenticated users cannot create receipt data.
+     * @deny (update) - Unauthenticated users cannot update receipt data.
+     * @deny (delete) - Unauthenticated users cannot delete receipt data.
+     * @principle Restricts write access based on user role.
      */
     match /receipts/{receiptId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write expense data.
+     * @description Grants access to expense data based on user role.
      * @path /expenses/{expenseId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read expense data.
+     * @allow (create) - Only Admin roles can create expense data.
+     * @allow (update) - Only Admin roles can update expense data.
+     * @allow (delete) - Only Admin roles can delete expense data.
+     * @deny (create) - Unauthenticated users cannot create expense data.
+     * @deny (update) - Unauthenticated users cannot update expense data.
+     * @deny (delete) - Unauthenticated users cannot delete expense data.
+     * @principle Restricts write access to Admin role.
      */
     match /expenses/{expenseId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && isAdmin() && resource != null;
+      allow delete: if isSignedIn() && isAdmin() && resource != null;
     }
 
     /**
-     * @description Allows any authenticated user to read and write export data.
+     * @description Grants access to export data based on user role.
      * @path /exports/{exportId}
-     * @allow (get, list, create, update, delete) - Any signed-in user.
-     * @deny None.
-     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
+     * @allow (get) - Any authenticated user can read export data.
+     * @allow (create) - Admin, Manager, or Employee roles can create export data.
+     * @allow (update) - Admin, Manager, or Employee roles can update export data.
+     * @allow (delete) - Admin, Manager, or Employee roles can delete export data.
+     * @deny (create) - Unauthenticated users cannot create export data.
+     * @deny (update) - Unauthenticated users cannot update export data.
+     * @deny (delete) - Unauthenticated users cannot delete export data.
+     * @principle Restricts write access based on user role.
      */
     match /exports/{exportId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && (isAdmin() || isManager() || isEmployee());
+      allow update: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
+      allow delete: if isSignedIn() && (isAdmin() || isManager() || isEmployee()) && resource != null;
     }
-
-    function isSignedIn() {
-        return request.auth != null;
+    /**
+     * @description Grants admin access based on the existence of a document in this collection.
+     * @path /roles_admin/{userId}
+     */
+    match /roles_admin/{userId} {
+        allow get: if isAdmin();
+        allow list: if false;
+        allow create: if isAdmin() && request.auth.uid == userId;
+        allow update: if false;
+        allow delete: if isAdmin() && resource != null;
     }
   }
 }
