@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -21,6 +20,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
@@ -31,8 +41,25 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [isResetting, setIsResetting] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isPasswordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [isConfirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const collectionsToClear = ['clients', 'exports', 'local_sales', 'financial_transactions'];
+
+  const handlePasswordSubmit = () => {
+    if (password === 'SK-Traders') {
+      setPasswordDialogOpen(false);
+      setConfirmDialogOpen(true);
+      setPassword(''); // Clear password after submission
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Incorrect Password',
+        description: 'The password you entered is incorrect. Please try again.',
+      });
+    }
+  };
 
   const handleResetData = async () => {
     if (!firestore) {
@@ -45,6 +72,7 @@ export default function SettingsPage() {
     }
 
     setIsResetting(true);
+    setConfirmDialogOpen(false);
 
     try {
       const batch = writeBatch(firestore);
@@ -102,9 +130,10 @@ export default function SettingsPage() {
                 This will permanently delete all clients, sales, exports, and financial records. Product stock will be reset to zero.
               </p>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isResetting}>
+            
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+              <DialogTrigger asChild>
+                 <Button variant="destructive" disabled={isResetting}>
                   {isResetting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -112,7 +141,32 @@ export default function SettingsPage() {
                   )}
                   Reset Data
                 </Button>
-              </AlertDialogTrigger>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Authentication Required</DialogTitle>
+                  <DialogDescription>
+                    To proceed, please enter the administrator password.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handlePasswordSubmit}>Proceed</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={isConfirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -122,12 +176,13 @@ export default function SettingsPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleResetData}>
+                  <AlertDialogAction onClick={handleResetData} className={buttonVariants({ variant: "destructive" })}>
                     Yes, reset data
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
           </div>
         </CardContent>
       </Card>
