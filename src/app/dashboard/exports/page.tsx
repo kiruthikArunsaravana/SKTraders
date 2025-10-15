@@ -44,7 +44,7 @@ export default function ExportsPage() {
 
   const exportsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
+    return query(collection(firestore, 'exports'), orderBy('date', 'desc'));
   }, [firestore]);
 
   const internationalClientsQuery = useMemoFirebase(() => {
@@ -103,7 +103,7 @@ export default function ExportsPage() {
         const from = dateRange.from;
         const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
         to.setHours(23, 59, 59, 999);
-        const expDate = exp.exportDate.toDate();
+        const expDate = exp.date.toDate();
         return isWithinInterval(expDate, { start: from, end: to });
       })();
 
@@ -156,7 +156,7 @@ export default function ExportsPage() {
       destinationPort,
       quantity,
       price,
-      exportDate: Timestamp.now(),
+      date: Timestamp.now(),
       status,
       paymentStatus,
       invoiceNumber,
@@ -270,7 +270,7 @@ export default function ExportsPage() {
       exp.clientName,
       productsMap.get(exp.productId as any)?.name || 'N/A',
       exp.destinationCountry,
-      format(exp.exportDate.toDate(), 'PP'),
+      format(exp.date.toDate(), 'PP'),
       exp.status,
       exp.paymentStatus,
       `$${(exp.quantity * exp.price).toLocaleString()}`
@@ -498,7 +498,7 @@ export default function ExportsPage() {
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(exp.paymentStatus)}>{exp.paymentStatus}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{format(exp.exportDate.toDate(), 'PP')}</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(exp.date.toDate(), 'PP')}</TableCell>
                     <TableCell className="text-right">${(exp.quantity * exp.price).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedExport(exp); setEditDialogOpen(true); }}>

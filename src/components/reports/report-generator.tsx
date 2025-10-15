@@ -78,12 +78,12 @@ export default function ReportGenerator() {
 
   const exportsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
+    return query(collection(firestore, 'exports'), orderBy('date', 'desc'));
   }, [firestore]);
 
   const localSalesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
+    return query(collection(firestore, 'local_sales'), orderBy('date', 'desc'));
   }, [firestore]);
 
   const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
@@ -276,8 +276,8 @@ export default function ReportGenerator() {
       return;
     }
     
-    const dateFilter = (item: { date?: Timestamp, exportDate?: Timestamp, saleDate?: Timestamp }) => {
-        const itemDate = item.date || item.exportDate || item.saleDate;
+    const dateFilter = (item: { date: Timestamp }) => {
+        const itemDate = item.date;
         if (!itemDate) return false;
         
         const transactionDate = itemDate.toDate();

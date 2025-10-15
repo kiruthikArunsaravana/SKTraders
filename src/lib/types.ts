@@ -43,7 +43,7 @@ export type Export = {
   destinationPort: string;
   quantity: number;
   price: number;
-  exportDate: Timestamp;
+  date: Timestamp;
   status: ExportStatus;
   paymentStatus: PaymentStatus;
   invoiceNumber: string;
@@ -58,7 +58,7 @@ export type LocalSale = {
   productId: string;
   quantity: number;
   price: number;
-  saleDate: Timestamp;
+  date: Timestamp;
   status: SaleStatus;
   paymentStatus: PaymentStatus;
   invoiceNumber: string;

@@ -43,7 +43,7 @@ export default function LocalSalesPage() {
 
   const salesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
+    return query(collection(firestore, 'local_sales'), orderBy('date', 'desc'));
   }, [firestore]);
 
   const localClientsQuery = useMemoFirebase(() => {
@@ -92,7 +92,7 @@ export default function LocalSalesPage() {
         const from = dateRange.from;
         const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
         to.setHours(23, 59, 59, 999);
-        const saleDate = sale.saleDate.toDate();
+        const saleDate = sale.date.toDate();
         return isWithinInterval(saleDate, { start: from, end: to });
       })();
 
@@ -141,7 +141,7 @@ export default function LocalSalesPage() {
       clientName: client.companyName,
       quantity,
       price,
-      saleDate: Timestamp.now(),
+      date: Timestamp.now(),
       status,
       paymentStatus,
       invoiceNumber,
@@ -251,7 +251,7 @@ export default function LocalSalesPage() {
     const tableData = filteredSales.map((sale) => [
       sale.clientName,
       productsMap.get(sale.productId as any)?.name || 'N/A',
-      format(sale.saleDate.toDate(), 'PP'),
+      format(sale.date.toDate(), 'PP'),
       sale.status,
       sale.paymentStatus,
       `$${(sale.quantity * sale.price).toLocaleString()}`
@@ -470,7 +470,7 @@ export default function LocalSalesPage() {
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(sale.paymentStatus)}>{sale.paymentStatus}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{format(sale.saleDate.toDate(), 'PP')}</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(sale.date.toDate(), 'PP')}</TableCell>
                     <TableCell className="text-right">${(sale.quantity * sale.price).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedSale(sale); setEditDialogOpen(true); }}>

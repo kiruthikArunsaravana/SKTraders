@@ -64,12 +64,12 @@ export default function DashboardPage() {
 
   const exportsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
+    return query(collection(firestore, 'exports'), orderBy('date', 'desc'));
   }, [firestore]);
 
   const localSalesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
+    return query(collection(firestore, 'local_sales'), orderBy('date', 'desc'));
   }, [firestore]);
 
   // Data fetching
@@ -154,12 +154,11 @@ export default function DashboardPage() {
 
     // Process exports
     const clientExportValues = new Map<string, {name: string, value: number}>();
-    const currentMonthExports = allExports.filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval));
+    const currentMonthExports = allExports.filter(e => isWithinInterval(e.date.toDate(), currentMonthInterval));
     
     const currentMonthExportValue = currentMonthExports.reduce((acc, e) => {
       const product = productsMap.get(e.productId as any);
-      const price = product ? product.sellingPrice : 0;
-      const saleValue = e.quantity * price;
+      const saleValue = e.quantity * e.price;
 
       if (product) {
          productSales.set(product.name, (productSales.get(product.name) || 0) + e.quantity);
@@ -174,12 +173,11 @@ export default function DashboardPage() {
 
      // Process local sales
     const clientLocalSaleValues = new Map<string, {name: string, value: number}>();
-    const currentMonthLocalSales = allLocalSales.filter(s => isWithinInterval(s.saleDate.toDate(), currentMonthInterval));
+    const currentMonthLocalSales = allLocalSales.filter(s => isWithinInterval(s.date.toDate(), currentMonthInterval));
 
     const currentMonthLocalSaleValue = currentMonthLocalSales.reduce((acc, s) => {
       const product = productsMap.get(s.productId as any);
-      const price = product ? product.sellingPrice : 0;
-      const saleValue = s.quantity * price;
+      const saleValue = s.quantity * s.price;
       
       if (product) {
          productSales.set(product.name, (productSales.get(product.name) || 0) + s.quantity);
