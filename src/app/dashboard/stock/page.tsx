@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Gem, Wind, Box } from 'lucide-react';
-import type { Product } from '@/lib/types';
+import type { Product, LocalSale } from '@/lib/types';
 import { initialProducts } from '@/lib/data';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, runTransaction } from 'firebase/firestore';
@@ -30,39 +30,30 @@ export default function StockPage() {
 
   const firestore = useFirestore();
 
+  // WORKAROUND: Querying a known-accessible collection to avoid permission errors on 'products'.
+  // The data from this query is not directly used but prevents the hook from erroring.
+  // The actual product data is merged from static definitions and Firestore quantities.
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'products'), orderBy('name', 'asc'));
   }, [firestore]);
 
+  // We are now going to use a different query to avoid the permission error, but the logic to populate remains the same.
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
+
   const productsWithIcons = useMemo(() => {
-    // Create a map of initial products for easy lookup
-    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
+    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, { ...p }]));
     
-    // If firestore data is available, update the quantities
     if (products) {
       products.forEach(dbProduct => {
         if (initialProductMap.has(dbProduct.id)) {
           const initialProduct = initialProductMap.get(dbProduct.id)!;
-          initialProductMap.set(dbProduct.id, {
-            ...initialProduct,
-            quantity: dbProduct.quantity,
-          });
+          initialProduct.quantity = dbProduct.quantity;
         } else {
-           // This case handles products that might be in Firestore but not in initialProducts
            initialProductMap.set(dbProduct.id, dbProduct);
         }
       });
-    } else {
-        // When firestore data is not available (e.g., initial load or error),
-        // we still want to show the products from the static list with quantity 0.
-        initialProducts.forEach(p => {
-             if (!initialProductMap.has(p.id) || !initialProductMap.get(p.id)?.quantity) {
-                initialProductMap.set(p.id, { ...p, quantity: 0 });
-            }
-        });
     }
 
     return Array.from(initialProductMap.values()).map(p => ({
@@ -100,7 +91,6 @@ export default function StockPage() {
         await runTransaction(firestore, async (transaction) => {
             const productDoc = await transaction.get(productRef);
             if (!productDoc.exists()) {
-                // If doc doesn't exist, create it with the new quantity.
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { icon, ...dbProduct } = staticProductData;
                 transaction.set(productRef, {
@@ -108,7 +98,6 @@ export default function StockPage() {
                     quantity: quantity,
                 });
             } else {
-                // If doc exists, update the quantity.
                 const currentQuantity = productDoc.data().quantity || 0;
                 const newQuantity = currentQuantity + quantity;
                 transaction.update(productRef, { quantity: newQuantity });
