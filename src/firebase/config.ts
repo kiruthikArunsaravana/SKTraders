@@ -4,5 +4,6 @@ export const firebaseConfig = {
   "apiKey": "AIzaSyAAd6lIcu5YWernNTd43BS_8qd5LNNxHxg",
   "authDomain": "husktrack1-91176301-abb2d.firebaseapp.com",
   "measurementId": "",
-  "messagingSenderId": "770032576241"
+  "messagingSenderId": "770032576241",
+  "storageBucket": "husktrack1-91176301-abb2d.appspot.com"
 };
