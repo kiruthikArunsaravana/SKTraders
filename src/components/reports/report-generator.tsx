@@ -122,6 +122,7 @@ export default function ReportGenerator() {
 
     const totalExportAmount = exports.reduce((sum, exp) => sum + exp.quantity * exp.price, 0);
     const totalLocalSalesAmount = localSales.reduce((sum, sale) => sum + sale.quantity * sale.price, 0);
+
     const totalHuskPurchaseAmount = transactions
       .filter(t => t.type === 'expense' && t.category === 'Husk')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
@@ -277,10 +278,9 @@ export default function ReportGenerator() {
     }
     
     const dateFilter = (item: { date: Timestamp }) => {
-        const itemDate = item.date;
-        if (!itemDate) return false;
+        if (!item?.date) return false;
         
-        const transactionDate = itemDate.toDate();
+        const transactionDate = item.date.toDate();
         const fromDate = values.dateRange.from;
         const toDate = values.dateRange.to ? new Date(values.dateRange.to) : new Date(fromDate);
         toDate.setHours(23, 59, 59, 999); // Set to end of day
