@@ -1,80 +1,37 @@
-/**
- * @fileoverview Firestore Security Rules for HuskTrack application.
- *
- * Core Philosophy:
- * This ruleset enforces a role-based access control model, granting specific
- * permissions based on the user's role (Admin, Manager, Employee) and the
- * ownership of data. User data is protected under `/users/{userId}`, while
- * application-wide data resides in top-level collections.
- *
- * Data Structure:
- * - /users/{userId}: Stores user profiles, with the 'role' field denormalized for
- *   authorization purposes.
- * - /clients/{clientId}: Stores client information.
- * - /products/{productId}: Stores product details.
- * - /stocks/{stockId}: Stores stock levels for products.
- * - /sales/{saleId}: Records sale transactions.
- * - /purchases/{purchaseId}: Tracks purchase transactions.
- * - /receipts/{receiptId}: Stores receipt information for sales or purchases.
- * - /expenses/{expenseId}: Details expense records.
- * - /exports/{exportId}: Manages export order details.
- *
- * Key Security Decisions:
- * - Users can only read and write their own profile data under /users/{userId}.
- * - Listing of users is disallowed to prevent unauthorized enumeration.
- * - Data validation focuses on authorization and relational integrity, omitting
- *   strict schema enforcement for rapid prototyping.
- * - All write operations are strictly controlled based on user roles and
- *   document ownership, preventing unauthorized modifications.
- *
- * Denormalization for Authorization:
- * - User roles are stored directly within the `/users/{userId}` document to
- *   avoid costly `get()` calls during authorization checks.
- *
- * Structural Segregation:
- * - User-specific data is stored under `/users/{userId}`, while application-wide
- *   data resides in top-level collections. This simplifies security rules and
- *   improves performance.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description: Manages user profiles, allowing users to read and write their own data.
-     * @path: /users/{userId}
-     * @allow: (create) - Authenticated user creates their profile with matching userId.
-     * @allow: (get, update, delete) - Authenticated user with matching userId accesses their profile.
-     * @deny: (create) - Authenticated user attempts to create a profile with a mismatched userId.
-     * @principle: Enforces document ownership for user profiles.
+     * @description Manages user profile data, ensuring users can only access their own profiles.
+     * @path /users/{userId}
+     * @allow (create) User with ID 'user123' can create their own profile if authenticated as 'user123'.
+     * @allow (update) User with ID 'user123' can update their own profile if authenticated as 'user123'.
+     * @deny (update) User with ID 'user123' cannot update another user's profile (e.g., 'user456').
+     * @principle Enforces user-ownership for profile data.
      */
     match /users/{userId} {
-      // Helper function to check if the user is signed in and owns the document.
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
 
-      allow get: if isOwner(userId);
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
     }
 
     /**
-     * @description: Manages client information. Only authenticated users can manage clients.
-     * @path: /clients/{clientId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage clients.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage clients.
-     * @principle: Restricts client management to authenticated users.
+     * @description Manages client data, accessible only to authenticated users.
+     * @path /clients/{clientId}
      */
     match /clients/{clientId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -87,14 +44,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages product information. Only authenticated users can manage products.
-     * @path: /products/{productId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage products.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage products.
-     * @principle: Restricts product management to authenticated users.
+     * @description Manages product data, accessible only to authenticated users.
+     * @path /products/{productId}
      */
     match /products/{productId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -107,14 +60,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages stock information. Only authenticated users can manage stock.
-     * @path: /stocks/{stockId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage stock.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage stock.
-     * @principle: Restricts stock management to authenticated users.
+     * @description Manages stock data, accessible only to authenticated users.
+     * @path /stocks/{stockId}
      */
     match /stocks/{stockId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -127,14 +76,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages sale transactions. Only authenticated users can manage sales.
-     * @path: /sales/{saleId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage sales.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage sales.
-     * @principle: Restricts sale management to authenticated users.
+     * @description Manages sale data, accessible only to authenticated users.
+     * @path /sales/{saleId}
      */
     match /sales/{saleId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -147,14 +92,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages purchase transactions. Only authenticated users can manage purchases.
-     * @path: /purchases/{purchaseId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage purchases.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage purchases.
-     * @principle: Restricts purchase management to authenticated users.
+     * @description Manages purchase data, accessible only to authenticated users.
+     * @path /purchases/{purchaseId}
      */
     match /purchases/{purchaseId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -167,14 +108,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages receipts. Only authenticated users can manage receipts.
-     * @path: /receipts/{receiptId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage receipts.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage receipts.
-     * @principle: Restricts receipt management to authenticated users.
+     * @description Manages receipt data, accessible only to authenticated users.
+     * @path /receipts/{receiptId}
      */
     match /receipts/{receiptId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -187,14 +124,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages expenses. Only authenticated users can manage expenses.
-     * @path: /expenses/{expenseId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage expenses.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage expenses.
-     * @principle: Restricts expense management to authenticated users.
+     * @description Manages expense data, accessible only to authenticated users.
+     * @path /expenses/{expenseId}
      */
     match /expenses/{expenseId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -207,14 +140,10 @@ service cloud.firestore {
     }
 
     /**
-     * @description: Manages exports. Only authenticated users can manage exports.
-     * @path: /exports/{exportId}
-     * @allow: (create, get, list, update, delete) - Authenticated user can manage exports.
-     * @deny: (create, get, list, update, delete) - Unauthenticated user tries to manage exports.
-     * @principle: Restricts export management to authenticated users.
+     * @description Manages export data, accessible only to authenticated users.
+     * @path /exports/{exportId}
      */
     match /exports/{exportId} {
-       // Helper function to check if the user is signed in.
       function isSignedIn() {
         return request.auth != null;
       }
@@ -225,24 +154,21 @@ service cloud.firestore {
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
-    
+
     /**
-     * @description: Restricts access to financial transactions. Only authenticated users can list.
-     * @path: /financial_transactions
-     * @allow: (list) - Authenticated user can list financial transactions.
-     * @deny: (get, create, update, delete) - All operations are denied.
-     * @principle: Restricts access to financial transactions.
+     * @description Manages financial_transactions data, accessible only to authenticated users.
+     * @path /financial_transactions
      */
-    match /financial_transactions/{document} {
-         // Helper function to check if the user is signed in.
-        function isSignedIn() {
-          return request.auth != null;
-        }
-        allow get: if false;
-        allow list: if isSignedIn();
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
+    match /financial_transactions {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }
