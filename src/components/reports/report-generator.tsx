@@ -112,21 +112,16 @@ export default function ReportGenerator() {
     const pendingExports = exports.filter(e => e.paymentStatus === 'Pending');
     const pendingLocalSales = localSales.filter(s => s.paymentStatus === 'Pending');
 
-    const totalIncomeFromClients = paidExports.reduce((sum, exp) => sum + (exp.quantity * exp.price), 0) +
-                                   paidLocalSales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
+    const incomeFromPaidSales = paidExports.reduce((sum, exp) => sum + exp.quantity * exp.price, 0) +
+                                paidLocalSales.reduce((sum, sale) => sum + sale.quantity * sale.price, 0);
 
-    const totalOtherIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalIncome = totalIncomeFromClients + totalOtherIncome;
-
+    const otherIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalIncome = incomeFromPaidSales + otherIncome;
     const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
     const netProfit = totalIncome - totalExpenses;
 
-    const totalExportAmount = exports.reduce((sum, exp) => sum + (exp.quantity * exp.price), 0);
-    const totalLocalSalesAmount = localSales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
-    
-    const totalStockCreated = transactions
-      .filter(t => t.type === 'expense' && t.category === 'Husk')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const totalExportAmount = exports.reduce((sum, exp) => sum + exp.quantity * exp.price, 0);
+    const totalLocalSalesAmount = localSales.reduce((sum, sale) => sum + sale.quantity * sale.price, 0);
 
     const productSales: { [key: string]: number } = {};
     [...localSales, ...exports].forEach(sale => {
@@ -154,13 +149,11 @@ export default function ReportGenerator() {
     finalY += 8;
 
     const summaryData = [
-        ['Total Income (from paid sales)', `$${totalIncomeFromClients.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Other Income', `$${totalOtherIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Income (Paid Sales + Other)', `$${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Expenses', `$${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Net Profit / Loss', `$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Export Value (Paid & Pending)', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Local Sales Value (Paid & Pending)', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Raw Husk Purchased', `$${totalStockCreated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Export Value (All Statuses)', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Local Sales Value (All Statuses)', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
     ];
 
     autoTable(doc, {
