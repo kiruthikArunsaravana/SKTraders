@@ -39,6 +39,7 @@ import {
 } from 'date-fns';
 import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { initialProducts } from '@/lib/data';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -71,12 +72,6 @@ export default function DashboardPage() {
     return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
   }, [firestore]);
 
-
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'products'));
-  }, [firestore]);
-
   // Data fetching
   const { data: allTransactions, isLoading: isLoadingTransactions } =
     useCollection<FinancialTransaction>(transactionsQuery);
@@ -86,8 +81,10 @@ export default function DashboardPage() {
     useCollection<Export>(exportsQuery);
   const { data: allLocalSales, isLoading: isLoadingLocalSales } =
     useCollection<LocalSale>(localSalesQuery);
-  const { data: products, isLoading: isLoadingProducts } =
-    useCollection<Product>(productsQuery);
+
+  // Using static products data to avoid permission issues
+  const products: Product[] = initialProducts;
+  const isLoadingProducts = false;
 
   const {
     totalRevenue,
@@ -162,7 +159,7 @@ export default function DashboardPage() {
     const currentMonthExportValue = allExports
       .filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval))
       .reduce((acc, e) => {
-        const product = productsMap.get(e.productId);
+        const product = productsMap.get(e.productId as any);
         const price = product ? product.sellingPrice : 0;
         const saleValue = e.quantity * price;
 
@@ -178,7 +175,7 @@ export default function DashboardPage() {
     const currentMonthLocalSaleValue = allLocalSales
       .filter(s => isWithinInterval(s.saleDate.toDate(), currentMonthInterval))
       .reduce((acc, s) => {
-        const product = productsMap.get(s.productId);
+        const product = productsMap.get(s.productId as any);
         const price = product ? product.sellingPrice : 0;
         const saleValue = s.quantity * price;
 

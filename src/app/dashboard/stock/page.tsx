@@ -55,6 +55,14 @@ export default function StockPage() {
            initialProductMap.set(dbProduct.id, dbProduct);
         }
       });
+    } else {
+        // When firestore data is not available (e.g., initial load or error),
+        // we still want to show the products from the static list with quantity 0.
+        initialProducts.forEach(p => {
+             if (!initialProductMap.has(p.id) || !initialProductMap.get(p.id)?.quantity) {
+                initialProductMap.set(p.id, { ...p, quantity: 0 });
+            }
+        });
     }
 
     return Array.from(initialProductMap.values()).map(p => ({
@@ -223,5 +231,3 @@ export default function StockPage() {
     </div>
   );
 }
-
-    

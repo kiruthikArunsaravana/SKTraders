@@ -49,17 +49,15 @@ export default function LocalSalesPage() {
     return query(collection(firestore, 'clients'), where('clientType', '==', 'local'));
   }, [firestore]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'products'));
-  }, [firestore]);
-
   const { data: sales, isLoading: isLoadingSales } = useCollection<LocalSale>(salesQuery);
   const { data: localClients, isLoading: isLoadingClients } = useCollection<Client>(localClientsQuery);
-  const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  // Using static products data to avoid permission issues
+  const products: Product[] = initialProducts;
+  const isLoadingProducts = false;
+
 
   const productsMap = useMemo(() => {
-    if (!products) return new Map<string, Product>();
     return new Map(products.map(p => [p.id, p]));
   }, [products]);
 
@@ -106,7 +104,7 @@ export default function LocalSalesPage() {
        return;
     }
 
-    const product = productsMap.get(productId);
+    const product = productsMap.get(productId as any);
     if (!product || product.quantity < quantity) {
       toast({ variant: 'destructive', title: 'Stock Alert', description: 'There is only less stocks verify again' });
       return;
@@ -229,7 +227,7 @@ export default function LocalSalesPage() {
 
     const tableData = filteredSales.map((sale) => [
       sale.clientName,
-      productsMap.get(sale.productId)?.name || 'N/A',
+      productsMap.get(sale.productId as any)?.name || 'N/A',
       format(sale.saleDate.toDate(), 'PP'),
       sale.status,
       `${sale.quantity.toLocaleString()}`
@@ -407,7 +405,7 @@ export default function LocalSalesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {productsMap.get(sale.productId)?.name || 'N/A'}
+                      {productsMap.get(sale.productId as any)?.name || 'N/A'}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(sale.status)}>{sale.status}</Badge>

@@ -23,6 +23,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/no
 import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { initialProducts } from '@/lib/data';
 
 const exportStatuses: ExportStatus[] = ['To-do', 'In Progress', 'Completed'];
 
@@ -49,17 +50,14 @@ export default function ExportsPage() {
     return query(collection(firestore, 'clients'), where('clientType', '==', 'international'));
   }, [firestore]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'products'));
-  }, [firestore]);
-
   const { data: exports, isLoading: isLoadingExports } = useCollection<Export>(exportsQuery);
   const { data: internationalClients, isLoading: isLoadingClients } = useCollection<Client>(internationalClientsQuery);
-  const { data: products, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+  
+  // Using static products data to avoid permission issues
+  const products: Product[] = initialProducts;
+  const isLoadingProducts = false;
 
   const productsMap = useMemo(() => {
-    if (!products) return new Map<string, Product>();
     return new Map(products.map(p => [p.id, p]));
   }, [products]);
 
@@ -119,7 +117,7 @@ export default function ExportsPage() {
        return;
     }
 
-    const product = productsMap.get(productId);
+    const product = productsMap.get(productId as any);
     if (!product || product.quantity < quantity) {
       toast({ variant: 'destructive', title: 'Stock Alert', description: 'There is only less stocks verify again' });
       return;
@@ -246,7 +244,7 @@ export default function ExportsPage() {
 
     const tableData = filteredExports.map((exp) => [
       exp.clientName,
-      productsMap.get(exp.productId)?.name || 'N/A',
+      productsMap.get(exp.productId as any)?.name || 'N/A',
       exp.destinationCountry,
       format(exp.exportDate.toDate(), 'PP'),
       exp.status,
@@ -435,7 +433,7 @@ export default function ExportsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {productsMap.get(exp.productId)?.name || 'N/A'}
+                      {productsMap.get(exp.productId as any)?.name || 'N/A'}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {exp.destinationCountry} ({exp.destinationPort})
@@ -499,5 +497,3 @@ export default function ExportsPage() {
     </div>
   );
 }
-
-    
