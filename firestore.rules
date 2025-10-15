@@ -1,237 +1,143 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders
+ * @fileoverview Firestore Security Rules for SK Traders.
  *
  * Core Philosophy:
- * This ruleset provides basic authentication, but relies on Spring Security on the backend for role-based access control (RBAC).
- * It avoids complex authorization logic within the rules and simplifies security by focusing on authentication.
- * All users who are authenticated can read and write data.
+ * This ruleset provides open access to all data.
  *
  * Data Structure:
- * The Firestore database consists of top-level collections for core entities:
- * - /clients/{clientId}
- * - /products/{productId}
- * - /stocks/{stockId}
- * - /sales/{saleId}
- * - /purchases/{purchaseId}
- * - /receipts/{receiptId}
- * - /expenses/{expenseId}
- * - /exports/{exportId}
+ * The database consists of several top-level collections: `clients`, `products`, `stocks`, `sales`, `purchases`, `receipts`, `expenses`, and `exports`.
  *
  * Key Security Decisions:
- * - Role-based access control is enforced on the backend.
- * - No user-specific data segregation within Firestore.
- * - All authenticated users have read and write access to all collections.
- * - The `financial_transactions` collection from the error message does not exist in the data model, access to this path will be denied.
+ * All read and write operations are open. This is for prototyping purposes only and is not suitable for production.
+ *
+ * Denormalization for Authorization:
+ * Not applicable, as all data is open.
+ *
+ * Structural Segregation:
+ * Not applicable, as all collections are treated equally.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user is signed in
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     /**
-     * @description Grants access to authenticated users to read and write client data.
+     * @description Allows anyone to read or write client data.
      * @path /clients/{clientId}
-     * @allow (create) User with valid auth can create a client document.
-     * @deny (create) Unauthenticated user cannot create a client document.
-     * @allow (get) Authenticated user can read client data.
-     * @deny (get) Unauthenticated user cannot read client data.
-     * @allow (list) Authenticated user can list clients.
-     * @deny (list) Unauthenticated user cannot list clients.
-     * @allow (update) Authenticated user can update client data.
-     * @deny (update) Unauthenticated user cannot update client data.
-     * @allow (delete) Authenticated user can delete client data.
-     * @deny (delete) Unauthenticated user cannot delete client data.
-     * @principle Allows authenticated users to perform all CRUD operations on client documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve a client.
+     * @allow (list) Any user can list clients.
+     * @allow (create) Any user can create a client.
+     * @allow (update) Any user can update a client.
+     * @allow (delete) Any user can delete a client.
+     * @principle Open access for prototyping.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write product data.
+     * @description Allows anyone to read or write product data.
      * @path /products/{productId}
-     * @allow (create) User with valid auth can create a product document.
-     * @deny (create) Unauthenticated user cannot create a product document.
-     * @allow (get) Authenticated user can read product data.
-     * @deny (get) Unauthenticated user cannot read product data.
-     * @allow (list) Authenticated user can list products.
-     * @deny (list) Unauthenticated user cannot list products.
-     * @allow (update) Authenticated user can update product data.
-     * @deny (update) Unauthenticated user cannot update product data.
-     * @allow (delete) Authenticated user can delete product data.
-     * @deny (delete) Unauthenticated user cannot delete product data.
-     * @principle Allows authenticated users to perform all CRUD operations on product documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve a product.
+     * @allow (list) Any user can list products.
+     * @allow (create) Any user can create a product.
+     * @allow (update) Any user can update a product.
+     * @allow (delete) Any user can delete a product.
+     * @principle Open access for prototyping.
      */
     match /products/{productId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write stock data.
+     * @description Allows anyone to read or write stock data.
      * @path /stocks/{stockId}
-     * @allow (create) User with valid auth can create a stock document.
-     * @deny (create) Unauthenticated user cannot create a stock document.
-     * @allow (get) Authenticated user can read stock data.
-     * @deny (get) Unauthenticated user cannot read stock data.
-     * @allow (list) Authenticated user can list stocks.
-     * @deny (list) Unauthenticated user cannot list stocks.
-     * @allow (update) Authenticated user can update stock data.
-     * @deny (update) Unauthenticated user cannot update stock data.
-     * @allow (delete) Authenticated user can delete stock data.
-     * @deny (delete) Unauthenticated user cannot delete stock data.
-     * @principle Allows authenticated users to perform all CRUD operations on stock documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve stock information.
+     * @allow (list) Any user can list stock information.
+     * @allow (create) Any user can create stock information.
+     * @allow (update) Any user can update stock information.
+     * @allow (delete) Any user can delete stock information.
+     * @principle Open access for prototyping.
      */
     match /stocks/{stockId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write sale data.
+     * @description Allows anyone to read or write sales data.
      * @path /sales/{saleId}
-     * @allow (create) User with valid auth can create a sale document.
-     * @deny (create) Unauthenticated user cannot create a sale document.
-     * @allow (get) Authenticated user can read sale data.
-     * @deny (get) Unauthenticated user cannot read sale data.
-     * @allow (list) Authenticated user can list sales.
-     * @deny (list) Unauthenticated user cannot list sales.
-     * @allow (update) Authenticated user can update sale data.
-     * @deny (update) Unauthenticated user cannot update sale data.
-     * @allow (delete) Authenticated user can delete sale data.
-     * @deny (delete) Unauthenticated user cannot delete sale data.
-     * @principle Allows authenticated users to perform all CRUD operations on sale documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve sales data.
+     * @allow (list) Any user can list sales data.
+     * @allow (create) Any user can create sales data.
+     * @allow (update) Any user can update sales data.
+     * @allow (delete) Any user can delete sales data.
+     * @principle Open access for prototyping.
      */
     match /sales/{saleId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write purchase data.
+     * @description Allows anyone to read or write purchase data.
      * @path /purchases/{purchaseId}
-     * @allow (create) User with valid auth can create a purchase document.
-     * @deny (create) Unauthenticated user cannot create a purchase document.
-     * @allow (get) Authenticated user can read purchase data.
-     * @deny (get) Unauthenticated user cannot read purchase data.
-     * @allow (list) Authenticated user can list purchases.
-     * @deny (list) Unauthenticated user cannot list purchases.
-     * @allow (update) Authenticated user can update purchase data.
-     * @deny (update) Unauthenticated user cannot update purchase data.
-     * @allow (delete) Authenticated user can delete purchase data.
-     * @deny (delete) Unauthenticated user cannot delete purchase data.
-     * @principle Allows authenticated users to perform all CRUD operations on purchase documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve purchase data.
+     * @allow (list) Any user can list purchase data.
+     * @allow (create) Any user can create purchase data.
+     * @allow (update) Any user can update purchase data.
+     * @allow (delete) Any user can delete purchase data.
+     * @principle Open access for prototyping.
      */
     match /purchases/{purchaseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write receipt data.
+     * @description Allows anyone to read or write receipt data.
      * @path /receipts/{receiptId}
-     * @allow (create) User with valid auth can create a receipt document.
-     * @deny (create) Unauthenticated user cannot create a receipt document.
-     * @allow (get) Authenticated user can read receipt data.
-     * @deny (get) Unauthenticated user cannot read receipt data.
-     * @allow (list) Authenticated user can list receipts.
-     * @deny (list) Unauthenticated user cannot list receipts.
-     * @allow (update) Authenticated user can update receipt data.
-     * @deny (update) Unauthenticated user cannot update receipt data.
-     * @allow (delete) Authenticated user can delete receipt data.
-     * @deny (delete) Unauthenticated user cannot delete receipt data.
-     * @principle Allows authenticated users to perform all CRUD operations on receipt documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve receipt data.
+     * @allow (list) Any user can list receipt data.
+     * @allow (create) Any user can create receipt data.
+     * @allow (update) Any user can update receipt data.
+     * @allow (delete) Any user can delete receipt data.
+     * @principle Open access for prototyping.
      */
     match /receipts/{receiptId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write expense data.
+     * @description Allows anyone to read or write expense data.
      * @path /expenses/{expenseId}
-     * @allow (create) User with valid auth can create an expense document.
-     * @deny (create) Unauthenticated user cannot create an expense document.
-     * @allow (get) Authenticated user can read expense data.
-     * @deny (get) Unauthenticated user cannot read expense data.
-     * @allow (list) Authenticated user can list expenses.
-     * @deny (list) Unauthenticated user cannot list expenses.
-     * @allow (update) Authenticated user can update expense data.
-     * @deny (update) Unauthenticated user cannot update expense data.
-     * @allow (delete) Authenticated user can delete expense data.
-     * @deny (delete) Unauthenticated user cannot delete expense data.
-     * @principle Allows authenticated users to perform all CRUD operations on expense documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve expense data.
+     * @allow (list) Any user can list expense data.
+     * @allow (create) Any user can create expense data.
+     * @allow (update) Any user can update expense data.
+     * @allow (delete) Any user can delete expense data.
+     * @principle Open access for prototyping.
      */
     match /expenses/{expenseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
 
     /**
-     * @description Grants access to authenticated users to read and write export data.
+     * @description Allows anyone to read or write export data.
      * @path /exports/{exportId}
-     * @allow (create) User with valid auth can create an export document.
-     * @deny (create) Unauthenticated user cannot create an export document.
-     * @allow (get) Authenticated user can read export data.
-     * @deny (get) Unauthenticated user cannot read export data.
-     * @allow (list) Authenticated user can list exports.
-     * @deny (list) Unauthenticated user cannot list exports.
-     * @allow (update) Authenticated user can update export data.
-     * @deny (update) Unauthenticated user cannot update export data.
-     * @allow (delete) Authenticated user can delete export data.
-     * @deny (delete) Unauthenticated user cannot delete export data.
-     * @principle Allows authenticated users to perform all CRUD operations on export documents, relying on backend RBAC for granular access control.
+     * @allow (get) Any user can retrieve export data.
+     * @allow (list) Any user can list export data.
+     * @allow (create) Any user can create export data.
+     * @allow (update) Any user can update export data.
+     * @allow (delete) Any user can delete export data.
+     * @principle Open access for prototyping.
      */
     match /exports/{exportId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
-    }
-
-    /**
-     * @description Denies access to the `financial_transactions` collection as it is not defined in the data model.
-     * @path /financial_transactions
-     * @deny (get) Any user attempting to get a document in this collection.
-     * @deny (list) Any user attempting to list documents in this collection.
-     * @deny (create) Any user attempting to create a document in this collection.
-     * @deny (update) Any user attempting to update a document in this collection.
-     * @deny (delete) Any user attempting to delete a document in this collection.
-     * @principle Enforces a strict deny policy for a non-existent collection, preventing unauthorized access.
-     */
-    match /financial_transactions/{document} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if true;
+      allow create, update, delete: if true;
     }
   }
 }
