@@ -46,6 +46,19 @@ export type Export = {
   invoiceNumber: string;
 };
 
+export type SaleStatus = 'To-do' | 'In Progress' | 'Completed';
+
+export type LocalSale = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  productId: string;
+  quantity: number;
+  saleDate: Timestamp;
+  status: SaleStatus;
+  invoiceNumber: string;
+};
+
 export interface NavItem {
   href: string;
   label: string;

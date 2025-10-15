@@ -11,6 +11,7 @@ import {
   LifeBuoy,
   FileText,
   DollarSign,
+  Truck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '@/lib/types';
@@ -23,6 +24,7 @@ export default function AppSidebar() {
     { href: '/dashboard/clients', label: 'Clients', icon: Users },
     { href: '/dashboard/stock', label: 'Stock', icon: Boxes },
     { href: '/dashboard/exports', label: 'Exports', icon: Globe },
+    { href: '/dashboard/local-sales', label: 'Local Sales', icon: Truck },
     { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
     { href: '/dashboard/reports', label: 'Reports', icon: FileText },
   ];

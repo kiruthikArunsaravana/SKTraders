@@ -366,6 +366,57 @@
         "contact",
         "date"
       ]
+    },
+    "LocalSale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LocalSale",
+      "type": "object",
+      "description": "Represents a local sale order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the local sale entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to Client. (Relationship: Client 1:N LocalSale)"
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Denormalized client's company name for easy display."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the sale.",
+          "format": "date-time"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Product Quantity."
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "description": "Invoice number for the sale."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the sale."
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "clientName",
+        "date",
+        "productId",
+        "quantity",
+        "invoiceNumber",
+        "status"
+      ]
     }
   },
   "auth": {
@@ -516,6 +567,22 @@
             {
               "name": "exportId",
               "description": "The unique identifier for the export."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/local_sales/{localSaleId}",
+        "definition": {
+          "entityName": "LocalSale",
+          "schema": {
+            "$ref": "#/backend/entities/LocalSale"
+          },
+          "description": "Stores local sale order details.",
+          "params": [
+            {
+              "name": "localSaleId",
+              "description": "The unique identifier for the local sale."
             }
           ]
         }
