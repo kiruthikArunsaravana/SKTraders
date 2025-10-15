@@ -32,12 +32,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
-import type { FinancialTransaction } from '@/lib/types';
+import type { FinancialTransaction, Export, LocalSale, Product } from '@/lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { initialProducts } from '@/lib/data';
 
 
 const reportSchema = z.object({
@@ -54,6 +55,8 @@ type PdfGenerationData = {
   title: string;
   dateRange: { from: Date; to: Date };
   transactions: FinancialTransaction[];
+  exports: Export[];
+  localSales: LocalSale[];
 };
 
 export default function ReportGenerator() {
@@ -73,27 +76,56 @@ export default function ReportGenerator() {
     return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
   }, [firestore]);
 
+  const exportsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
+  }, [firestore]);
+
+  const localSalesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
+  }, [firestore]);
+
   const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<FinancialTransaction>(transactionsQuery);
+  const { data: allExports, isLoading: isLoadingExports } = useCollection<Export>(exportsQuery);
+  const { data: allLocalSales, isLoading: isLoadingLocalSales } = useCollection<LocalSale>(localSalesQuery);
 
   const generatePdf = async (data: PdfGenerationData) => {
     setPdfPending(true);
-    const { title, dateRange, transactions } = data;
-    
-    if (transactions.length === 0) {
+    const { title, dateRange, transactions, exports, localSales } = data;
+
+    if (transactions.length === 0 && exports.length === 0 && localSales.length === 0) {
       toast({
         variant: 'destructive',
         title: 'No Data Found',
-        description: 'There are no transactions in the selected date range to generate a report.',
+        description: 'There is no data in the selected date range to generate a report.',
       });
       setPdfPending(false);
       return;
     }
 
     const doc = new jsPDF();
+    const productsMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
 
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const netProfit = totalIncome + totalExpenses;
+    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const netProfit = totalIncome - totalExpenses;
+
+    const totalExportAmount = exports.reduce((sum, exp) => {
+      const product = productsMap.get(exp.productId);
+      return sum + (exp.quantity * (product?.sellingPrice || 0));
+    }, 0);
+
+    const totalLocalSalesAmount = localSales.reduce((sum, sale) => {
+      const product = productsMap.get(sale.productId);
+      return sum + (sale.quantity * (product?.sellingPrice || 0));
+    }, 0);
+    
+    // Assumption: "stocks created" are husk purchases, which are recorded as expenses.
+    const totalStockCreated = transactions
+      .filter(t => t.type === 'expense' && t.category === 'Husk')
+      .reduce((sum, t) => sum + t.amount, 0); // This is amount, not quantity. Let's assume user wants the expense value.
+
 
     doc.setFont('Playfair Display', 'bold');
     doc.setFontSize(22);
@@ -109,40 +141,55 @@ export default function ReportGenerator() {
     
     doc.setFontSize(16);
     doc.setFont('Playfair Display', 'bold');
-    doc.text('Financial Summary', 14, finalY);
+    doc.text('Overall Summary', 14, finalY);
     finalY += 10;
 
-    doc.setFont('PT Sans', 'normal');
-    doc.setFontSize(12);
-    doc.text(`Total Income: $${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
-    finalY += 6;
-    doc.text(`Total Expenses: $${Math.abs(totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
-    finalY += 8;
-    
-    doc.setFont('PT Sans', 'bold');
-    doc.text(`Net Profit / Loss: $${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, finalY);
-    finalY += 12;
-
-    const tableData = transactions.map(t => {
-      return [
-        // Ensure date is a Date object before formatting
-        format(t.date instanceof Timestamp ? t.date.toDate() : t.date, 'yyyy-MM-dd'),
-        t.description,
-        t.category,
-        t.type.charAt(0).toUpperCase() + t.type.slice(1),
-        `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ];
-    });
+    const summaryData = [
+        ['Total Income', `$${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Expenses', `$${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Net Profit / Loss', `$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Export Value', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Local Sales Value', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Raw Husk Purchased', `$${Math.abs(totalStockCreated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+    ];
 
     autoTable(doc, {
-      startY: finalY,
-      head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [40, 50, 80] },
+        startY: finalY,
+        body: summaryData,
+        theme: 'plain',
+        styles: { font: 'PT Sans', fontSize: 12 },
+        columnStyles: { 0: { fontStyle: 'bold' } },
     });
+    
+    finalY = (doc as any).lastAutoTable.finalY + 10;
 
-    finalY = (doc as any).lastAutoTable.finalY || finalY;
+    if(transactions.length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('Playfair Display', 'bold');
+        doc.text('Detailed Transactions', 14, finalY);
+        finalY += 10;
+
+        const tableData = transactions.map(t => {
+          return [
+            format(t.date instanceof Timestamp ? t.date.toDate() : t.date, 'yyyy-MM-dd'),
+            t.description,
+            t.category,
+            t.type.charAt(0).toUpperCase() + t.type.slice(1),
+            `$${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ];
+        });
+
+        autoTable(doc, {
+          startY: finalY,
+          head: [['Date', 'Description', 'Category/Product', 'Type', 'Amount']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [40, 50, 80] },
+        });
+
+        finalY = (doc as any).lastAutoTable.finalY || finalY;
+    }
+
     doc.setFontSize(10);
     doc.text(`--- End of Report ---`, 14, finalY + 10);
 
@@ -157,39 +204,51 @@ export default function ReportGenerator() {
   async function onSubmit(values: z.infer<typeof reportSchema>) {
     setPdfPending(true);
     
-    if (!allTransactions) {
+    const loading = isLoadingTransactions || isLoadingExports || isLoadingLocalSales;
+    const dataUnavailable = !allTransactions || !allExports || !allLocalSales;
+
+    if (loading || dataUnavailable) {
        toast({
         variant: 'destructive',
         title: 'Data not loaded',
-        description: 'Transaction data is still loading, please try again in a moment.',
+        description: 'Data is still loading, please try again in a moment.',
       });
       setPdfPending(false);
       return;
     }
-
-    const filteredTransactions = allTransactions.filter(t => {
-        const transactionDate = t.date.toDate();
+    
+    const dateFilter = (item: { date?: Timestamp, exportDate?: Timestamp, saleDate?: Timestamp }) => {
+        const itemDate = item.date || item.exportDate || item.saleDate;
+        if (!itemDate) return false;
+        const transactionDate = itemDate.toDate();
         return isWithinInterval(transactionDate, { start: values.dateRange.from, end: values.dateRange.to });
-    });
+    }
+
+    const filteredTransactions = allTransactions.filter(dateFilter);
+    const filteredExports = allExports.filter(dateFilter);
+    const filteredLocalSales = allLocalSales.filter(dateFilter);
 
     await generatePdf({
       title: values.reportTitle,
       dateRange: values.dateRange,
       transactions: filteredTransactions,
+      exports: filteredExports,
+      localSales: filteredLocalSales,
     });
     
     setPdfPending(false);
   }
 
+  const isLoading = isLoadingTransactions || isLoadingExports || isLoadingLocalSales;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Generate Financial Report</CardTitle>
+            <CardTitle>Generate Comprehensive Report</CardTitle>
             <CardDescription>
-              Select a date range and provide a title for your PDF report.
+              Select a date range to generate a PDF report with a full business summary.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -261,8 +320,8 @@ export default function ReportGenerator() {
             />
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="submit" disabled={isPdfPending || isLoadingTransactions}>
-              {isPdfPending || isLoadingTransactions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            <Button type="submit" disabled={isPdfPending || isLoading}>
+              {isPdfPending || isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Generate PDF Report
             </Button>
           </CardFooter>
@@ -271,3 +330,5 @@ export default function ReportGenerator() {
     </Form>
   );
 }
+
+    
