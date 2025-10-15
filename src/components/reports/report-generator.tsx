@@ -47,7 +47,7 @@ const reportSchema = z.object({
   }),
   dateRange: z.object({
     from: z.date({ required_error: 'A start date is required.' }),
-    to: z.date({ required_error: 'An end date is required.' }),
+    to: z.date().optional(),
   }),
 });
 
@@ -221,19 +221,27 @@ export default function ReportGenerator() {
     const dateFilter = (item: { date?: Timestamp, exportDate?: Timestamp, saleDate?: Timestamp }) => {
         const itemDate = item.date || item.exportDate || item.saleDate;
         if (!itemDate) return false;
+        
         const transactionDate = itemDate.toDate();
-        const toDate = new Date(values.dateRange.to);
-        toDate.setHours(23, 59, 59, 999);
-        return isWithinInterval(transactionDate, { start: values.dateRange.from, end: toDate });
+        const fromDate = values.dateRange.from;
+        const toDate = values.dateRange.to ? new Date(values.dateRange.to) : new Date(fromDate);
+        toDate.setHours(23, 59, 59, 999); // Set to end of day
+        
+        return isWithinInterval(transactionDate, { start: fromDate, end: toDate });
     }
 
     const filteredTransactions = allTransactions.filter(dateFilter);
     const filteredExports = allExports.filter(dateFilter);
     const filteredLocalSales = allLocalSales.filter(dateFilter);
+    
+    const finalDateRange = {
+        from: values.dateRange.from,
+        to: values.dateRange.to || values.dateRange.from
+    };
 
     await generatePdf({
       title: values.reportTitle,
-      dateRange: values.dateRange,
+      dateRange: finalDateRange,
       transactions: filteredTransactions,
       exports: filteredExports,
       localSales: filteredLocalSales,
