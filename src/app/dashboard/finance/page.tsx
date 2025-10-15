@@ -141,7 +141,8 @@ export default function FinancePage() {
           totalIncome += t.amount;
           dayData.income += t.amount;
         } else {
-          totalExpenses += t.amount;
+          totalExpenses += Math.abs(t.amount);
+          dayData.expenses += Math.abs(t.amount);
         }
       });
 
