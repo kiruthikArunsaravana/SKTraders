@@ -130,7 +130,7 @@ export default function ReportGenerator() {
 
     const productSales: { [key: string]: number } = {};
     [...localSales, ...exports].forEach(sale => {
-        const productName = productsMap.get(sale.productId)?.name || 'Unknown Product';
+        const productName = productsMap.get(sale.productId as 'coco-pith' | 'coir-fiber' | 'husk-chips')?.name || 'Unknown Product';
         productSales[productName] = (productSales[productName] || 0) + sale.quantity;
     });
 
