@@ -127,15 +127,12 @@ export default function DashboardPage() {
     let currentMonthExpenses = 0;
     let prevMonthExpenses = 0;
     
-    const productSales = new Map<string, number>();
-
-    // Process all transactions
+    // Process all transactions for financial overview
     allTransactions.forEach((t) => {
       const transactionDate = t.date.toDate();
       if (t.type === 'income') {
         if (isWithinInterval(transactionDate, currentMonthInterval)) {
           currentMonthRevenue += t.amount;
-          productSales.set(t.category, (productSales.get(t.category) || 0) + 1); // Assuming 1 unit per transaction for simplicity
         } else if (isWithinInterval(transactionDate, prevMonthInterval)) {
           prevMonthRevenue += t.amount;
         }
@@ -153,38 +150,47 @@ export default function DashboardPage() {
     const expenseChange = prevMonthExpenses > 0 ? ((currentMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 : currentMonthExpenses > 0 ? 100 : 0;
 
     const productsMap = new Map(products.map(p => [p.id, p]));
+    const productSales = new Map<string, number>();
 
     // Process exports
     const clientExportValues = new Map<string, {name: string, value: number}>();
-    const currentMonthExportValue = allExports
-      .filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval))
-      .reduce((acc, e) => {
-        const product = productsMap.get(e.productId as any);
-        const price = product ? product.sellingPrice : 0;
-        const saleValue = e.quantity * price;
+    const currentMonthExports = allExports.filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval));
+    
+    const currentMonthExportValue = currentMonthExports.reduce((acc, e) => {
+      const product = productsMap.get(e.productId as any);
+      const price = product ? product.sellingPrice : 0;
+      const saleValue = e.quantity * price;
 
-        const clientRecord = clientExportValues.get(e.clientId) || { name: e.clientName, value: 0 };
-        clientRecord.value += saleValue;
-        clientExportValues.set(e.clientId, clientRecord);
+      if (product) {
+         productSales.set(product.name, (productSales.get(product.name) || 0) + e.quantity);
+      }
 
-        return acc + saleValue;
-      }, 0);
+      const clientRecord = clientExportValues.get(e.clientId) || { name: e.clientName, value: 0 };
+      clientRecord.value += saleValue;
+      clientExportValues.set(e.clientId, clientRecord);
+
+      return acc + saleValue;
+    }, 0);
 
      // Process local sales
     const clientLocalSaleValues = new Map<string, {name: string, value: number}>();
-    const currentMonthLocalSaleValue = allLocalSales
-      .filter(s => isWithinInterval(s.saleDate.toDate(), currentMonthInterval))
-      .reduce((acc, s) => {
-        const product = productsMap.get(s.productId as any);
-        const price = product ? product.sellingPrice : 0;
-        const saleValue = s.quantity * price;
+    const currentMonthLocalSales = allLocalSales.filter(s => isWithinInterval(s.saleDate.toDate(), currentMonthInterval));
 
-        const clientRecord = clientLocalSaleValues.get(s.clientId) || { name: s.clientName, value: 0 };
-        clientRecord.value += saleValue;
-        clientLocalSaleValues.set(s.clientId, clientRecord);
-        
-        return acc + saleValue;
-      }, 0);
+    const currentMonthLocalSaleValue = currentMonthLocalSales.reduce((acc, s) => {
+      const product = productsMap.get(s.productId as any);
+      const price = product ? product.sellingPrice : 0;
+      const saleValue = s.quantity * price;
+      
+      if (product) {
+         productSales.set(product.name, (productSales.get(product.name) || 0) + s.quantity);
+      }
+
+      const clientRecord = clientLocalSaleValues.get(s.clientId) || { name: s.clientName, value: 0 };
+      clientRecord.value += saleValue;
+      clientLocalSaleValues.set(s.clientId, clientRecord);
+      
+      return acc + saleValue;
+    }, 0);
 
     // Determine top clients
     const topInternational = [...clientExportValues.values()].sort((a,b) => b.value - a.value)[0];
@@ -192,8 +198,7 @@ export default function DashboardPage() {
     const topInternationalClient = topInternational ? { name: topInternational.name, value: topInternational.value } : { name: 'N/A', value: 0 };
     const topLocalClient = topLocal ? { name: topLocal.name, value: topLocal.value } : { name: 'N/A', value: 0 };
 
-
-    // Determine top product
+    // Determine top product based on quantity sold
     const top = [...productSales.entries()].sort((a, b) => b[1] - a[1])[0];
     const topProduct = top ? { name: top[0], units: top[1] } : { name: 'N/A', units: 0 };
 
