@@ -31,7 +31,7 @@ export default function AppSidebar() {
 
   const bottomNavItems: NavItem[] = [
     { href: '#', label: 'Support', icon: LifeBuoy },
-    { href: '#', label: 'Settings', icon: Settings },
+    { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   ];
 
   const renderNavItem = ({ href, label, icon: Icon }: NavItem) => {
