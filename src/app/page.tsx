@@ -17,7 +17,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
-  const [email, setEmail] = useState('admin@example.com');
+  const [email, setEmail] = useState('manager@gmail.com');
   const [password, setPassword] = useState('SecureP@ss123');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
@@ -111,7 +111,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@example.com"
+                  placeholder="manager@gmail.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
