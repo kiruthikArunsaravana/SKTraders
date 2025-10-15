@@ -417,6 +417,41 @@
         "invoiceNumber",
         "status"
       ]
+    },
+     "FinancialTransaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FinancialTransaction",
+      "type": "object",
+      "description": "Represents either an income or an expense transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the transaction."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of transaction, either 'income' or 'expense'.",
+          "enum": ["income", "expense"]
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary value of the transaction. Positive for income, negative for expense."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the transaction."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date and time the transaction occurred.",
+          "format": "date-time"
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the income (e.g., product name) or expense (e.g., 'Labour')."
+        }
+      },
+      "required": ["id", "type", "amount", "description", "date", "category"]
     }
   },
   "auth": {
@@ -586,8 +621,23 @@
             }
           ]
         }
+      },
+      {
+        "path": "/financial_transactions/{transactionId}",
+        "definition": {
+          "entityName": "FinancialTransaction",
+          "schema": { "$ref": "#/backend/entities/FinancialTransaction" },
+          "description": "Stores all income and expense transactions.",
+          "params": [
+            {
+              "name": "transactionId",
+              "description": "The unique identifier for the financial transaction."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to reflect the core entities of the HuskTrack system and enforce robust security rules. Key design decisions prioritize authorization independence through denormalization and structural segregation for simplified rules and scalable security.  \n\n1.  **Authorization Independence (Denormalization):**\n    *   User roles are stored directly in the `/users/{userId}` document. This avoids the need for `get()` calls to determine a user's role during other operations. All other entities that require role based access depend on the uid which is provided by `request.auth.uid`.\n\n2.  **Structural Segregation:**\n    *   The structure segregates data based on ownership and access requirements. User-specific data resides under `/users/{userId}`, while global data like `/products` is stored at the root level.\n    *   This segregation simplifies security rules by ensuring that all documents within a collection share the same security posture. For example, only admins can modify product data, while users can only modify their own user documents.\n\n3.  **Access Modeling:**\n    *   **User-Owned Data:** The `/users/{userId}` collection follows the Path-Based Ownership model, granting users full control over their own data.\n    *   **Global Data:** The `/products`, `/clients` collections are accessible to users with appropriate roles (e.g., Admin for products, Manager/Admin for clients).\n\n4. **QAPs (Rules are not Filters):**\n    * Role based access to product, sale, purchase, receipt, expense and export data enables secure `list` operations, as read operations are constrained to authorized users via `request.auth.uid` and its comparison with roles present in each entity."
+    "reasoning": "The Firestore structure is designed to reflect the core entities of the HuskTrack system and enforce robust security rules. Key design decisions prioritize authorization independence through denormalization and structural segregation for simplified rules and scalable security.  \n\n1.  **Authorization Independence (Denormalization):**\n    *   User roles are stored directly in the `/users/{userId}` document. This avoids the need for `get()` calls to determine a user's role during other operations. All other entities that require role based access depend on the uid which is provided by `request.auth.uid` and its comparison with roles present in each entity.\n\n2.  **Structural Segregation:**\n    *   The structure segregates data based on ownership and access requirements. User-specific data resides under `/users/{userId}`, while global data like `/products` is stored at the root level.\n    *   This segregation simplifies security rules by ensuring that all documents within a collection share the same security posture. For example, only admins can modify product data, while users can only modify their own user documents.\n\n3.  **Access Modeling:**\n    *   **User-Owned Data:** The `/users/{userId}` collection follows the Path-Based Ownership model, granting users full control over their own data.\n    *   **Global Data:** The `/products`, `/clients` collections are accessible to users with appropriate roles (e.g., Admin for products, Manager/Admin for clients).\n\n4. **QAPs (Rules are not Filters):**\n    * Role based access to product, sale, purchase, receipt, expense and export data enables secure `list` operations, as read operations are constrained to authorized users via `request.auth.uid` and its comparison with roles present in each entity."
   }
 }
+    
