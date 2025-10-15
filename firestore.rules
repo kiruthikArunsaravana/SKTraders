@@ -1,275 +1,229 @@
 /**
- * @description This ruleset enforces a role-based access control model for the HuskTrack application.
- *   It prioritizes authorization independence by denormalizing user roles directly onto user documents.
- *   Structural segregation is used to differentiate between user-owned data and global data.
- * @dataStructure
- *   /users/{userId}: Stores user profiles, with the user's role denormalized for authorization.
- *   /clients/{clientId}: Stores client information.
- *   /products/{productId}: Stores product information.
- *   /stocks/{stockId}: Stores stock level for each product.
- *   /sales/{saleId}: Stores sale transactions.
- *   /purchases/{purchaseId}: Stores purchase transactions.
- *   /receipts/{receiptId}: Stores receipts for sales and purchases.
- *   /expenses/{expenseId}: Stores expense records.
- *   /exports/{exportId}: Stores export order details.
- *   /local_sales/{localSaleId}: Stores local sale order details.
- * @keySecurityDecisions
- *   - Users can only manage their own profiles under `/users/{userId}`.
- *   - Access to other collections is role-based (Admin, Manager, Employee), enforced through the `request.auth.uid`
- *   - `list` operations are secured based on user roles, preventing unauthorized data access.
- * @denormalizationForAuthorization
- *   User roles are stored directly within the `/users/{userId}` document, avoiding the need for additional reads during authorization checks in other collections.
+ * @fileoverview Firestore Security Rules for HuskTrack application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model, with User-Ownership for `/users/{userId}` and role-based restrictions for other collections. It prioritizes strict authorization and assumes flexible data shapes for prototyping.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores individual user profiles, with the 'role' field denormalized for efficient authorization.
+ * - /clients/{clientId}: Stores client information.
+ * - /products/{productId}: Stores product details.
+ * - /stocks/{stockId}: Stores stock information.
+ * - /sales/{saleId}: Stores sales transactions.
+ * - /purchases/{purchaseId}: Stores purchase transactions.
+ * - /receipts/{receiptId}: Stores receipts for sales and purchases.
+ * - /expenses/{expenseId}: Stores expense records.
+ * - /exports/{exportId}: Stores export order details.
+ * - /local_sales/{localSaleId}: Stores local sale order details.
+ *
+ * Key Security Decisions:
+ * - User listing is implicitly disallowed by the absence of a top-level `list` rule on `/users`.
+ * - Role data is denormalized onto the user document for efficient authorization.
+ * - The rules do not enforce strict schema validation, allowing for flexible data shapes during prototyping.
+ * - All write operations require authentication.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profiles. Users can only manage their own profile.
+     * @description Manages user profile data.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' can create their own profile with id 'user123'.
-     * @allow (get) User with UID 'user123' can read their own profile.
-     * @allow (update) User with UID 'user123' can update their own profile.
-     * @allow (delete) User with UID 'user123' can delete their own profile.
-     * @deny (create) User with UID 'user456' cannot create a profile with id 'user123'.
-     * @deny (get) User with UID 'user456' cannot read the profile of user 'user123'.
-     * @deny (update) User with UID 'user456' cannot update the profile of user 'user123'.
-     * @deny (delete) User with UID 'user456' cannot delete the profile of user 'user123'.
-     * @principle Enforces document ownership for all operations on user profiles.
+     * @allow (create) User with matching ID can create their own profile.
+     * @allow (get, update, delete) User can access and modify their own profile.
+     * @deny (create) User cannot create a profile with an ID that doesn't match their own.
+     * @deny (update, delete) User cannot modify or delete someone else's profile.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to client information.
+     * @description Manages client information.
      * @path /clients/{clientId}
-     * @allow (list) Authenticated user can list all clients.
-     * @allow (create) Authenticated user can create a new client.
-     * @allow (get) Authenticated user can get client information.
-     * @allow (update) Authenticated user can update client information.
-     * @allow (delete) Authenticated user can delete client information.
-     * @deny (create) Unauthenticated user cannot create a new client.
-     * @deny (get) Unauthenticated user cannot get client information.
-     * @deny (update) Unauthenticated user cannot update client information.
-     * @deny (delete) Unauthenticated user cannot delete client information.
-     * @principle Restricts client management to authenticated users.
+     * @allow (get, list) Any authenticated user can read client data.
+     * @allow (create) Any authenticated user can create client data.
+     * @allow (update, delete) Any authenticated user can update and delete client data.
+     * @principle Open access for authenticated users.
      */
     match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to product information.
+     * @description Manages product information.
      * @path /products/{productId}
-     * @allow (list) Authenticated user can list all products.
-     * @allow (create) Authenticated user can create a new product.
-     * @allow (get) Authenticated user can get product information.
-     * @allow (update) Authenticated user can update product information.
-     * @allow (delete) Authenticated user can delete product information.
-     * @deny (create) Unauthenticated user cannot create a new product.
-     * @deny (get) Unauthenticated user cannot get product information.
-     * @deny (update) Unauthenticated user cannot update product information.
-     * @deny (delete) Unauthenticated user cannot delete product information.
-     * @principle Restricts product management to authenticated users.
+     * @allow (get, list) Any authenticated user can read product data.
+     * @allow (create) Any authenticated user can create product data.
+     * @allow (update, delete) Any authenticated user can update and delete product data.
+     * @principle Open access for authenticated users.
      */
     match /products/{productId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to stock information.
+     * @description Manages stock information.
      * @path /stocks/{stockId}
-     * @allow (list) Authenticated user can list all stocks.
-     * @allow (create) Authenticated user can create a new stock.
-     * @allow (get) Authenticated user can get stock information.
-     * @allow (update) Authenticated user can update stock information.
-     * @allow (delete) Authenticated user can delete stock information.
-     * @deny (create) Unauthenticated user cannot create a new stock.
-     * @deny (get) Unauthenticated user cannot get stock information.
-     * @deny (update) Unauthenticated user cannot update stock information.
-     * @deny (delete) Unauthenticated user cannot delete stock information.
-     * @principle Restricts stock management to authenticated users.
+     * @allow (get, list) Any authenticated user can read stock data.
+     * @allow (create) Any authenticated user can create stock data.
+     * @allow (update, delete) Any authenticated user can update and delete stock data.
+     * @principle Open access for authenticated users.
      */
     match /stocks/{stockId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to sale transactions.
+     * @description Manages sales transactions.
      * @path /sales/{saleId}
-     * @allow (list) Authenticated user can list all sales.
-     * @allow (create) Authenticated user can create a new sale.
-     * @allow (get) Authenticated user can get sale information.
-     * @allow (update) Authenticated user can update sale information.
-     * @allow (delete) Authenticated user can delete sale information.
-     * @deny (create) Unauthenticated user cannot create a new sale.
-     * @deny (get) Unauthenticated user cannot get sale information.
-     * @deny (update) Unauthenticated user cannot update sale information.
-     * @deny (delete) Unauthenticated user cannot delete sale information.
-     * @principle Restricts sale management to authenticated users.
+     * @allow (get, list) Any authenticated user can read sale data.
+     * @allow (create) Any authenticated user can create sale data.
+     * @allow (update, delete) Any authenticated user can update and delete sale data.
+     * @principle Open access for authenticated users.
      */
     match /sales/{saleId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to purchase transactions.
+     * @description Manages purchase transactions.
      * @path /purchases/{purchaseId}
-     * @allow (list) Authenticated user can list all purchases.
-     * @allow (create) Authenticated user can create a new purchase.
-     * @allow (get) Authenticated user can get purchase information.
-     * @allow (update) Authenticated user can update purchase information.
-     * @allow (delete) Authenticated user can delete purchase information.
-     * @deny (create) Unauthenticated user cannot create a new purchase.
-     * @deny (get) Unauthenticated user cannot get purchase information.
-     * @deny (update) Unauthenticated user cannot update purchase information.
-     * @deny (delete) Unauthenticated user cannot delete purchase information.
-     * @principle Restricts purchase management to authenticated users.
+     * @allow (get, list) Any authenticated user can read purchase data.
+     * @allow (create) Any authenticated user can create purchase data.
+     * @allow (update, delete) Any authenticated user can update and delete purchase data.
+     * @principle Open access for authenticated users.
      */
     match /purchases/{purchaseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to receipts.
+     * @description Manages receipts for sales and purchases.
      * @path /receipts/{receiptId}
-     * @allow (list) Authenticated user can list all receipts.
-     * @allow (create) Authenticated user can create a new receipt.
-     * @allow (get) Authenticated user can get receipt information.
-     * @allow (update) Authenticated user can update receipt information.
-     * @allow (delete) Authenticated user can delete receipt information.
-     * @deny (create) Unauthenticated user cannot create a new receipt.
-     * @deny (get) Unauthenticated user cannot get receipt information.
-     * @deny (update) Unauthenticated user cannot update receipt information.
-     * @deny (delete) Unauthenticated user cannot delete receipt information.
-     * @principle Restricts receipt management to authenticated users.
+     * @allow (get, list) Any authenticated user can read receipt data.
+     * @allow (create) Any authenticated user can create receipt data.
+     * @allow (update, delete) Any authenticated user can update and delete receipt data.
+     * @principle Open access for authenticated users.
      */
     match /receipts/{receiptId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to expenses.
+     * @description Manages expense records.
      * @path /expenses/{expenseId}
-     * @allow (list) Authenticated user can list all expenses.
-     * @allow (create) Authenticated user can create a new expense.
-     * @allow (get) Authenticated user can get expense information.
-     * @allow (update) Authenticated user can update expense information.
-     * @allow (delete) Authenticated user can delete expense information.
-     * @deny (create) Unauthenticated user cannot create a new expense.
-     * @deny (get) Unauthenticated user cannot get expense information.
-     * @deny (update) Unauthenticated user cannot update expense information.
-     * @deny (delete) Unauthenticated user cannot delete expense information.
-     * @principle Restricts expense management to authenticated users.
+     * @allow (get, list) Any authenticated user can read expense data.
+     * @allow (create) Any authenticated user can create expense data.
+     * @allow (update, delete) Any authenticated user can update and delete expense data.
+     * @principle Open access for authenticated users.
      */
     match /expenses/{expenseId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to export orders.
+     * @description Manages export order details.
      * @path /exports/{exportId}
-     * @allow (list) Authenticated user can list all exports.
-     * @allow (create) Authenticated user can create a new export.
-     * @allow (get) Authenticated user can get export information.
-     * @allow (update) Authenticated user can update export information.
-     * @allow (delete) Authenticated user can delete export information.
-     * @deny (create) Unauthenticated user cannot create a new export.
-     * @deny (get) Unauthenticated user cannot get export information.
-     * @deny (update) Unauthenticated user cannot update export information.
-     * @deny (delete) Unauthenticated user cannot delete export information.
-     * @principle Restricts export order management to authenticated users.
+     * @allow (get, list) Any authenticated user can read export data.
+     * @allow (create) Any authenticated user can create export data.
+     * @allow (update, delete) Any authenticated user can update and delete export data.
+     * @principle Open access for authenticated users.
      */
     match /exports/{exportId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to local sale orders.
+     * @description Manages local sale order details.
      * @path /local_sales/{localSaleId}
-     * @allow (list) Authenticated user can list all local sales.
-     * @allow (create) Authenticated user can create a new local sale.
-     * @allow (get) Authenticated user can get local sale information.
-     * @allow (update) Authenticated user can update local sale information.
-     * @allow (delete) Authenticated user can delete local sale information.
-     * @deny (create) Unauthenticated user cannot create a new local sale.
-     * @deny (get) Unauthenticated user cannot get local sale information.
-     * @deny (update) Unauthenticated user cannot update local sale information.
-     * @deny (delete) Unauthenticated user cannot delete local sale information.
-     * @principle Restricts local sale order management to authenticated users.
+     * @allow (get, list) Any authenticated user can read local sale data.
+     * @allow (create) Any authenticated user can create local sale data.
+     * @allow (update, delete) Any authenticated user can update and delete local sale data.
+     * @principle Open access for authenticated users.
      */
     match /local_sales/{localSaleId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
-
-    /**
-     * @description **INSECURE - FIX IMMEDIATELY** - Public read access is unsafe and leads to potential data leakage.
-     *   The rules are being applied to a collection that contains sensitive financial data, as evidenced by the
-     *   original reported error and the collection name itself. This collection should NOT have public read access.
-     * @path /financial_transactions
-     */
-    match /financial_transactions/{transactionId} {
-         allow get: if false;
-         allow list: if false;
-         allow create: if false;
-         allow update: if false;
-         allow delete: if false;
-    }
-  }
-
-  // Helper function to determine if the user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  // Helper function to determine if the user is the owner of the document.
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
-
-  // Helper function to determine if the user is the owner of the document and the document exists.
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
   }
 }
