@@ -124,7 +124,7 @@ export default function ReportGenerator() {
     // Assumption: "stocks created" are husk purchases, which are recorded as expenses.
     const totalStockCreated = transactions
       .filter(t => t.type === 'expense' && t.category === 'Husk')
-      .reduce((sum, t) => sum + t.amount, 0); // This is amount, not quantity. Let's assume user wants the expense value.
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
 
     doc.setFont('Playfair Display', 'bold');
@@ -134,15 +134,16 @@ export default function ReportGenerator() {
     doc.setFont('PT Sans', 'normal');
     doc.setFontSize(11);
     doc.text(`For SK Traders`, 14, 30);
-    doc.text(`Date Range: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`, 14, 36);
-    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 42);
+    doc.text(`Date Range: ${format(dateRange.from, 'PPP')} - ${format(dateRange.to, 'PPP')}`, 14, 42);
+    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 36);
+
 
     let finalY = 50;
     
     doc.setFontSize(16);
     doc.setFont('Playfair Display', 'bold');
     doc.text('Overall Summary', 14, finalY);
-    finalY += 10;
+    finalY += 8;
 
     const summaryData = [
         ['Total Income', `$${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
@@ -150,15 +151,15 @@ export default function ReportGenerator() {
         ['Net Profit / Loss', `$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Export Value', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Local Sales Value', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Raw Husk Purchased', `$${Math.abs(totalStockCreated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Raw Husk Purchased', `$${totalStockCreated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
     ];
 
     autoTable(doc, {
         startY: finalY,
+        head: [['Summary Metric', 'Amount']],
         body: summaryData,
-        theme: 'plain',
-        styles: { font: 'PT Sans', fontSize: 12 },
-        columnStyles: { 0: { fontStyle: 'bold' } },
+        theme: 'grid',
+        headStyles: { fillColor: [40, 50, 80] },
     });
     
     finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -167,7 +168,7 @@ export default function ReportGenerator() {
         doc.setFontSize(16);
         doc.setFont('Playfair Display', 'bold');
         doc.text('Detailed Transactions', 14, finalY);
-        finalY += 10;
+        finalY += 8;
 
         const tableData = transactions.map(t => {
           return [
@@ -221,7 +222,9 @@ export default function ReportGenerator() {
         const itemDate = item.date || item.exportDate || item.saleDate;
         if (!itemDate) return false;
         const transactionDate = itemDate.toDate();
-        return isWithinInterval(transactionDate, { start: values.dateRange.from, end: values.dateRange.to });
+        const toDate = new Date(values.dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        return isWithinInterval(transactionDate, { start: values.dateRange.from, end: toDate });
     }
 
     const filteredTransactions = allTransactions.filter(dateFilter);
@@ -330,5 +333,3 @@ export default function ReportGenerator() {
     </Form>
   );
 }
-
-    
