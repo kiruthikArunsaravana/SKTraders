@@ -1,174 +1,224 @@
+/**
+ * @fileoverview Firestore Security Rules for HuskTrack application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model, granting specific
+ * permissions based on the user's role (Admin, Manager, Employee). It also implements 
+ * ownership-based access for user profiles.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, with 'role' denormalized for authorization.
+ * - /clients/{clientId}: Stores client information.
+ * - /products/{productId}: Stores product information.
+ * - /stocks/{stockId}: Stores stock information.
+ * - /sales/{saleId}: Stores sales transaction data.
+ * - /purchases/{purchaseId}: Stores purchase transaction data.
+ * - /receipts/{receiptId}: Stores receipt information.
+ * - /expenses/{expenseId}: Stores expense data.
+ * - /exports/{exportId}: Stores export order details.
+ *
+ * Key Security Decisions:
+ * - Strict role-based access control for all collections except /users.
+ * - Users can only manage their own profiles (/users/{userId}).
+ * - No listing of the /users collection is allowed.
+ *
+ * Denormalization for Authorization:
+ * - User roles are denormalized into the /users/{userId} document, avoiding costly `get()` calls.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profile data, ensuring users can only access their own profiles.
+     * @description Checks if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user's ID matches the requested user ID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is an Admin.
+     */
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'Admin';
+    }
+
+    /**
+     * @description Checks if the user is a Manager.
+     */
+    function isManager() {
+      return isSignedIn() && request.auth.token.role == 'Manager';
+    }
+    
+    /**
+     * @description Checks if the user is an Employee.
+     */
+    function isEmployee() {
+      return isSignedIn() && request.auth.token.role == 'Employee';
+    }
+
+    /**
+     * @description Checks if the user is the owner and the resource exists.
+     */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }    
+
+    /**
+     * @description Security rules for /users/{userId} collection.
      * @path /users/{userId}
-     * @allow (create) User with ID 'user123' can create their own profile if authenticated as 'user123'.
-     * @allow (update) User with ID 'user123' can update their own profile if authenticated as 'user123'.
-     * @deny (update) User with ID 'user123' cannot update another user's profile (e.g., 'user456').
-     * @principle Enforces user-ownership for profile data.
+     * @allow (create) - Authenticated user can create their own profile if the userId matches their auth.uid.
+     * @allow (get, update, delete) - Authenticated user can read, update, or delete their own profile.
+     * @deny (create) - If the userId does not match the authenticated user's uid.
+     * @deny (list) - Listing of all users is not allowed.
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId);
       allow list: if false;
 
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Manages client data, accessible only to authenticated users.
+     * @description Security rules for /clients/{clientId} collection.
      * @path /clients/{clientId}
+     * @allow (get, list) - Admins, Managers, and Employees can read all clients.
+     * @allow (create) - Only Admins and Managers can create new clients.
+     * @allow (update, delete) - Only Admins and Managers can update or delete clients.
+     * @deny (create) - Regular users cannot create clients.
+     * @principle Role-based access control for managing client information.
      */
     match /clients/{clientId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages product data, accessible only to authenticated users.
+     * @description Security rules for /products/{productId} collection.
      * @path /products/{productId}
+     * @allow (get, list) - Anyone can read product information.
+     * @allow (create, update, delete) - Only Admins can create, update, or delete products.
+     * @deny (create) - Non-admins cannot create products.
+     * @principle Role-based access control for managing product catalog.
      */
     match /products/{productId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Manages stock data, accessible only to authenticated users.
+     * @description Security rules for /stocks/{stockId} collection.
      * @path /stocks/{stockId}
+     * @allow (get, list) - Admins, Managers and Employees can read stock information.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete stock information.
+     * @deny (create) - Regular users cannot create stock information.
+     * @principle Role-based access control for managing stock levels.
      */
     match /stocks/{stockId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages sale data, accessible only to authenticated users.
+     * @description Security rules for /sales/{saleId} collection.
      * @path /sales/{saleId}
+     * @allow (get, list) - Admins, Managers and Employees can read sale transactions.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete sales transactions.
+     * @deny (create) - Regular users cannot create sale transactions.
+     * @principle Role-based access control for managing sales transactions.
      */
     match /sales/{saleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages purchase data, accessible only to authenticated users.
+     * @description Security rules for /purchases/{purchaseId} collection.
      * @path /purchases/{purchaseId}
+     * @allow (get, list) - Admins, Managers and Employees can read purchase transactions.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete purchase transactions.
+     * @deny (create) - Regular users cannot create purchase transactions.
+     * @principle Role-based access control for managing purchase transactions.
      */
     match /purchases/{purchaseId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages receipt data, accessible only to authenticated users.
+     * @description Security rules for /receipts/{receiptId} collection.
      * @path /receipts/{receiptId}
+     * @allow (get, list) - Admins, Managers and Employees can read receipts.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete receipts.
+     * @deny (create) - Regular users cannot create receipts.
+     * @principle Role-based access control for managing receipts.
      */
     match /receipts/{receiptId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages expense data, accessible only to authenticated users.
+     * @description Security rules for /expenses/{expenseId} collection.
      * @path /expenses/{expenseId}
+     * @allow (get, list) - Admins, Managers and Employees can read expenses.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete expenses.
+     * @deny (create) - Regular users cannot create expenses.
+     * @principle Role-based access control for managing expenses.
      */
     match /expenses/{expenseId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages export data, accessible only to authenticated users.
+     * @description Security rules for /exports/{exportId} collection.
      * @path /exports/{exportId}
+     * @allow (get, list) - Admins, Managers and Employees can read exports.
+     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete exports.
+     * @deny (create) - Regular users cannot create exports.
+     * @principle Role-based access control for managing exports.
      */
     match /exports/{exportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
-
+    
     /**
-     * @description Manages financial_transactions data, accessible only to authenticated users.
+     * @description Missing required role for Financial Transactions
      * @path /financial_transactions
      */
-    match /financial_transactions {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+    match /financial_transactions/{transactionId} {
+      allow get, list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
   }
 }
