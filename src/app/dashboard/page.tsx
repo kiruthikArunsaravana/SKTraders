@@ -28,7 +28,7 @@ import {
 } from 'recharts';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { FinancialTransaction, Export } from '@/lib/types';
+import type { FinancialTransaction, Export, Product } from '@/lib/types';
 import { useMemo } from 'react';
 import {
   startOfMonth,
@@ -66,6 +66,11 @@ export default function DashboardPage() {
     return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
   }, [firestore]);
 
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'));
+  }, [firestore]);
+
   // Data fetching
   const { data: allTransactions, isLoading: isLoadingTransactions } =
     useCollection<FinancialTransaction>(transactionsQuery);
@@ -73,6 +78,8 @@ export default function DashboardPage() {
     useCollection<FinancialTransaction>(recentTransactionsQuery);
   const { data: allExports, isLoading: isLoadingExports } =
     useCollection<Export>(exportsQuery);
+  const { data: products, isLoading: isLoadingProducts } =
+    useCollection<Product>(productsQuery);
 
   const {
     totalRevenue,
@@ -83,7 +90,7 @@ export default function DashboardPage() {
     topProduct,
     chartData,
   } = useMemo(() => {
-    if (!allTransactions || !allExports) {
+    if (!allTransactions || !allExports || !products) {
       return {
         totalRevenue: 0,
         revenueChange: 0,
@@ -134,10 +141,17 @@ export default function DashboardPage() {
     const revenueChange = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : currentMonthRevenue > 0 ? 100 : 0;
     const expenseChange = prevMonthExpenses > 0 ? ((currentMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 : currentMonthExpenses > 0 ? 100 : 0;
 
+    const productsMap = new Map(products.map(p => [p.id, p]));
+
     // Process exports
     const currentMonthExportValue = allExports
-        .filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval))
-        .reduce((acc, e) => acc + e.quantity, 0);
+      .filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval))
+      .reduce((acc, e) => {
+        const product = productsMap.get(e.productId);
+        const price = product ? product.sellingPrice : 0;
+        return acc + e.quantity * price;
+      }, 0);
+
 
     // Determine top product
     const top = [...productSales.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -177,9 +191,9 @@ export default function DashboardPage() {
       topProduct,
       chartData: Array.from(monthMap.values()),
     };
-  }, [allTransactions, allExports]);
+  }, [allTransactions, allExports, products]);
 
-  const isLoading = isLoadingTransactions || isLoadingExports || isLoadingRecent;
+  const isLoading = isLoadingTransactions || isLoadingExports || isLoadingRecent || isLoadingProducts;
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
