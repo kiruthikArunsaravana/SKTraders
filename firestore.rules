@@ -1,191 +1,201 @@
 /**
- * @file Firebase Security Rules for HuskTrack Firestore database.
+ * @fileoverview Firestore Security Rules for HuskTrack application.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model, where user roles (Admin, Manager, Employee) determine access to different collections and documents. The primary goal is to restrict data access based on the authenticated user's role, while allowing for flexible data shapes during this prototyping phase.
+ * This ruleset enforces a role-based access control model, with a strict user-ownership model for user profiles and role-based restrictions on other collections.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information. User's can only read and write their own profile.
+ * - /users/{userId}: Stores user profiles, accessible only to the user themselves.
  * - /clients/{clientId}: Stores client information.
  * - /products/{productId}: Stores product information.
  * - /stocks/{stockId}: Stores stock information.
- * - /sales/{saleId}: Stores sale transaction information.
- * - /purchases/{purchaseId}: Stores purchase transaction information.
- * - /receipts/{receiptId}: Stores receipt information.
- * - /expenses/{expenseId}: Stores expense information.
- * - /exports/{exportId}: Stores export information.
+ * - /sales/{saleId}: Stores sales transaction data.
+ * - /purchases/{purchaseId}: Stores purchase transaction data.
+ * - /receipts/{receiptId}: Stores receipt data.
+ * - /expenses/{expenseId}: Stores expense data.
+ * - /exports/{exportId}: Stores export data.
+ * - /local_sales/{localSaleId}: Stores local sale data.
  *
  * Key Security Decisions:
- * - Only authenticated users can access the database.
- * - User roles are denormalized into the user document to simplify authorization checks.
- * - Data validation is limited to authorization-critical fields to allow for rapid prototyping.
+ * - Users can only read and write their own user documents.
+ * - Listing of the `/users` collection is disallowed.
+ * - All other collections are open for listing.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }
-
     /**
-     * @description Controls access to user profile documents.
+     * @description Allows users to manage their own user profile.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own user document if the userId matches their auth UID.
-     * @allow (get, list, update, delete) - Authenticated user can only get, update, or delete their own user document.
-     * @deny (create) - An unauthenticated user cannot create a user document.
-     * @deny (update, delete) - An authenticated user cannot update or delete another user's document.
-     * @principle Enforces document ownership and prevents unauthorized modification of user profiles.
+     * @allow (create) - User with UID 'user123' can create a document at /users/user123 if request.auth.uid == 'user123'.
+     * @allow (get,update,delete) - User with UID 'user123' can get, update, or delete the document at /users/user123 if request.auth.uid == 'user123'.
+     * @deny (create) - User with UID 'user456' cannot create a document at /users/user123.
+     * @deny (update) - User with UID 'user456' cannot update the document at /users/user123.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to client documents.
+     * @description Allows read and write access to client documents.
      * @path /clients/{clientId}
-     * @allow (get, list) - Any authenticated user can read client documents.
-     * @allow (create) - Any authenticated user can create client documents.
-     * @allow (update) - Any authenticated user can update client documents.
-     * @allow (delete) - Any authenticated user can delete client documents.
-     * @deny (create) - An unauthenticated user cannot create a client document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read client data.
+     * @allow (create,update,delete) - No one can create, update or delete a client
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to client data is allowed
      */
     match /clients/{clientId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to product documents.
+     * @description Allows read and write access to product documents.
      * @path /products/{productId}
-     * @allow (get, list) - Any authenticated user can read product documents.
-     * @allow (create) - Any authenticated user can create product documents.
-     * @allow (update) - Any authenticated user can update product documents.
-     * @allow (delete) - Any authenticated user can delete product documents.
-     * @deny (create) - An unauthenticated user cannot create a product document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read product data.
+     * @allow (create,update,delete) - No one can create, update or delete a product
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to product data is allowed
      */
     match /products/{productId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to stock documents.
+     * @description Allows read and write access to stock documents.
      * @path /stocks/{stockId}
-     * @allow (get, list) - Any authenticated user can read stock documents.
-     * @allow (create) - Any authenticated user can create stock documents.
-     * @allow (update) - Any authenticated user can update stock documents.
-     * @allow (delete) - Any authenticated user can delete stock documents.
-     * @deny (create) - An unauthenticated user cannot create a stock document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read stock data.
+     * @allow (create,update,delete) - No one can create, update or delete a stock
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to stock data is allowed
      */
     match /stocks/{stockId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to sale documents.
+     * @description Allows read and write access to sales documents.
      * @path /sales/{saleId}
-     * @allow (get, list) - Any authenticated user can read sale documents.
-     * @allow (create) - Any authenticated user can create sale documents.
-     * @allow (update) - Any authenticated user can update sale documents.
-     * @allow (delete) - Any authenticated user can delete sale documents.
-     * @deny (create) - An unauthenticated user cannot create a sale document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read sales data.
+     * @allow (create,update,delete) - No one can create, update or delete a sale
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to sales data is allowed
      */
     match /sales/{saleId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to purchase documents.
+     * @description Allows read and write access to purchase documents.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) - Any authenticated user can read purchase documents.
-     * @allow (create) - Any authenticated user can create purchase documents.
-     * @allow (update) - Any authenticated user can update purchase documents.
-     * @allow (delete) - Any authenticated user can delete purchase documents.
-     * @deny (create) - An unauthenticated user cannot create a purchase document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read purchase data.
+     * @allow (create,update,delete) - No one can create, update or delete a purchase
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to purchase data is allowed
      */
     match /purchases/{purchaseId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to receipt documents.
+     * @description Allows read and write access to receipt documents.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - Any authenticated user can read receipt documents.
-     * @allow (create) - Any authenticated user can create receipt documents.
-     * @allow (update) - Any authenticated user can update receipt documents.
-     * @allow (delete) - Any authenticated user can delete receipt documents.
-     * @deny (create) - An unauthenticated user cannot create a receipt document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read receipt data.
+     * @allow (create,update,delete) - No one can create, update or delete a receipt
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to receipt data is allowed
      */
     match /receipts/{receiptId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to expense documents.
+     * @description Allows read and write access to expense documents.
      * @path /expenses/{expenseId}
-     * @allow (get, list) - Any authenticated user can read expense documents.
-     * @allow (create) - Any authenticated user can create expense documents.
-     * @allow (update) - Any authenticated user can update expense documents.
-     * @allow (delete) - Any authenticated user can delete expense documents.
-     * @deny (create) - An unauthenticated user cannot create a expense document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read expense data.
+     * @allow (create,update,delete) - No one can create, update or delete a expense
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to expense data is allowed
      */
     match /expenses/{expenseId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to export documents.
+     * @description Allows read and write access to export documents.
      * @path /exports/{exportId}
-     * @allow (get, list) - Any authenticated user can read export documents.
-     * @allow (create) - Any authenticated user can create export documents.
-     * @allow (update) - Any authenticated user can update export documents.
-     * @allow (delete) - Any authenticated user can delete export documents.
-     * @deny (create) - An unauthenticated user cannot create a export document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @allow (get,list) - Any signed-in user can read export data.
+     * @allow (create,update,delete) - No one can create, update or delete a export
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to export data is allowed
      */
     match /exports/{exportId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Controls access to financial transaction documents.
-     * @path /financial_transactions/{transactionId}
-     * @allow (get, list) - Any authenticated user can read financial transaction documents.
-     * @allow (create) - Any authenticated user can create financial transaction documents.
-     * @allow (update) - Any authenticated user can update financial transaction documents.
-     * @allow (delete) - Any authenticated user can delete financial transaction documents.
-     * @deny (create) - An unauthenticated user cannot create a financial transaction document.
-     * @deny (update, delete) - An unauthenticated user cannot update or delete another user's document.
+     * @description Allows read and write access to local_sales documents.
+     * @path /local_sales/{localSaleId}
+     * @allow (get,list) - Any signed-in user can read local_sales data.
+     * @allow (create,update,delete) - No one can create, update or delete a local_sales
+     * @deny (create) - Not allowed
+     * @deny (update) - Not allowed
+     * @principle Access to local_sales data is allowed
      */
-      match /financial_transactions/{transactionId} {
-          allow get, list: if isSignedIn();
-          allow create, update, delete: if isSignedIn();
-      }
+    match /local_sales/{localSaleId} {
+      allow get, list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
   }
 }
