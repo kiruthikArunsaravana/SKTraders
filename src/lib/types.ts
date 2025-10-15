@@ -36,6 +36,7 @@ export type ExportStatus = 'To-do' | 'In Progress' | 'Completed';
 export type Export = {
   id: string;
   clientId: string;
+  clientName: string;
   productId: string;
   destinationCountry: string;
   destinationPort: string;

@@ -318,6 +318,10 @@
           "type": "string",
           "description": "Reference to Client. (Relationship: Client 1:N Export)"
         },
+        "clientName": {
+          "type": "string",
+          "description": "Denormalized client's company name for easy display."
+        },
         "companyName": {
           "type": "string",
           "description": "International buyer's company name."
@@ -355,6 +359,7 @@
       "required": [
         "id",
         "clientId",
+        "clientName",
         "companyName",
         "country",
         "port",

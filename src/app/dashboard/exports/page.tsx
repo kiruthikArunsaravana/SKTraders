@@ -126,10 +126,15 @@ export default function ExportsPage() {
     }
     
     const client = internationalClients?.find(c => c.id === clientId);
+    if (!client) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selected client not found.' });
+      return;
+    }
 
     const exportsCollection = collection(firestore, 'exports');
     const newExportData = {
-      clientId: client?.companyName || clientId,
+      clientId: client.id,
+      clientName: client.companyName,
       destinationCountry: country,
       destinationPort,
       quantity,
@@ -147,7 +152,7 @@ export default function ExportsPage() {
     setDestinationCountry('');
     toast({
       title: "Export Order Added",
-      description: `Order for ${newExportData.clientId} has been successfully added.`,
+      description: `Order for ${newExportData.clientName} has been successfully added.`,
     });
   }
 
@@ -240,7 +245,7 @@ export default function ExportsPage() {
     doc.text(filterDescription, 14, 36);
 
     const tableData = filteredExports.map((exp) => [
-      exp.clientId,
+      exp.clientName,
       exp.destinationCountry,
       exp.destinationPort,
       format(exp.exportDate.toDate(), 'PP'),
@@ -409,7 +414,7 @@ export default function ExportsPage() {
                 filteredExports.map((exp) => (
                   <TableRow key={exp.id}>
                     <TableCell>
-                      <div className="font-medium">{exp.clientId}</div>
+                      <div className="font-medium">{exp.clientName}</div>
                       <div className="hidden text-sm text-muted-foreground md:inline">
                         INV: {exp.invoiceNumber}
                       </div>
@@ -448,7 +453,7 @@ export default function ExportsPage() {
           <DialogHeader>
             <DialogTitle>Edit Order Status</DialogTitle>
             <DialogDescription>
-              Update the status for the order for client {selectedExport?.clientId}.
+              Update the status for the order for client {selectedExport?.clientName}.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditStatus}>
