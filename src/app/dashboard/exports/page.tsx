@@ -49,13 +49,33 @@ export default function ExportsPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'clients'), where('clientType', '==', 'international'));
   }, [firestore]);
+  
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'), orderBy('name', 'asc'));
+  }, [firestore]);
 
   const { data: exports, isLoading: isLoadingExports } = useCollection<Export>(exportsQuery);
   const { data: internationalClients, isLoading: isLoadingClients } = useCollection<Client>(internationalClientsQuery);
-  
-  // Using static products data to avoid permission issues
-  const products: Product[] = initialProducts;
-  const isLoadingProducts = false;
+  const { data: dbProducts, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  const products = useMemo(() => {
+    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, { ...p }]));
+    
+    if (dbProducts) {
+      dbProducts.forEach(dbProduct => {
+        if (initialProductMap.has(dbProduct.id)) {
+          const initialProduct = initialProductMap.get(dbProduct.id)!;
+          initialProduct.quantity = dbProduct.quantity;
+        } else {
+           initialProductMap.set(dbProduct.id, dbProduct);
+        }
+      });
+    }
+
+    return Array.from(initialProductMap.values());
+  }, [dbProducts]);
+
 
   const productsMap = useMemo(() => {
     return new Map(products.map(p => [p.id, p]));
@@ -119,7 +139,7 @@ export default function ExportsPage() {
 
     const product = productsMap.get(productId as any);
     if (!product || product.quantity < quantity) {
-      toast({ variant: 'destructive', title: 'Stock Alert', description: 'There is only less stocks verify again' });
+      toast({ variant: 'destructive', title: 'Stock Alert', description: `There are only ${product?.quantity || 0} units of ${product?.name} available.` });
       return;
     }
     
@@ -357,7 +377,7 @@ export default function ExportsPage() {
                             <SelectContent>
                                 {isLoadingProducts ? <SelectItem value="loading" disabled>Loading products...</SelectItem> :
                                 products?.map(product => (
-                                    <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                                    <SelectItem key={product.id} value={product.id}>{product.name} ({product.quantity} avail.)</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
