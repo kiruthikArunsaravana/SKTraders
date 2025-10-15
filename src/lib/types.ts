@@ -31,6 +31,7 @@ export type FinancialTransaction = {
   category: string;
 };
 
+export type PaymentStatus = 'Pending' | 'Paid';
 export type ExportStatus = 'To-do' | 'In Progress' | 'Completed';
 
 export type Export = {
@@ -41,8 +42,10 @@ export type Export = {
   destinationCountry: string;
   destinationPort: string;
   quantity: number;
+  price: number;
   exportDate: Timestamp;
   status: ExportStatus;
+  paymentStatus: PaymentStatus;
   invoiceNumber: string;
 };
 
@@ -54,8 +57,10 @@ export type LocalSale = {
   clientName: string;
   productId: string;
   quantity: number;
+  price: number;
   saleDate: Timestamp;
   status: SaleStatus;
+  paymentStatus: PaymentStatus;
   invoiceNumber: string;
 };
 

@@ -17,7 +17,7 @@ import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import type { Export, ExportStatus, Client, Product } from '@/lib/types';
+import type { Export, ExportStatus, Client, Product, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { initialProducts } from '@/lib/data';
 
 const exportStatuses: ExportStatus[] = ['To-do', 'In Progress', 'Completed'];
+const paymentStatuses: PaymentStatus[] = ['Pending', 'Paid'];
 
 export default function ExportsPage() {
   const { toast } = useToast();
@@ -34,6 +35,7 @@ export default function ExportsPage() {
   const [selectedExport, setSelectedExport] = useState<Export | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [statusFilter, setStatusFilter] = useState<ExportStatus | 'all'>('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | 'all'>('all');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [destinationCountry, setDestinationCountry] = useState('');
 
@@ -106,13 +108,14 @@ export default function ExportsPage() {
       })();
 
       const hasStatus = statusFilter === 'all' || exp.status === statusFilter;
+      const hasPaymentStatus = paymentStatusFilter === 'all' || exp.paymentStatus === paymentStatusFilter;
       
-      return isInDateRange && hasStatus;
+      return isInDateRange && hasStatus && hasPaymentStatus;
     });
-  }, [exports, dateRange, statusFilter]);
+  }, [exports, dateRange, statusFilter, paymentStatusFilter]);
 
   const totalValue = useMemo(() => {
-    return filteredExports.reduce((acc, exp) => acc + exp.quantity, 0);
+    return filteredExports.reduce((acc, exp) => acc + (exp.quantity * exp.price), 0);
   }, [filteredExports]);
 
 
@@ -128,11 +131,13 @@ export default function ExportsPage() {
     const country = formData.get('destinationCountry') as string;
     const destinationPort = formData.get('destinationPort') as string;
     const quantity = parseFloat(formData.get('quantity') as string);
+    const price = parseFloat(formData.get('price') as string);
     const status = formData.get('status') as ExportStatus;
+    const paymentStatus = formData.get('paymentStatus') as PaymentStatus;
     const invoiceNumber = formData.get('invoiceNumber') as string;
     const productId = formData.get('productId') as string;
     
-    if (!clientId || !country || !destinationPort || !quantity || !status || !invoiceNumber || !productId) {
+    if (!clientId || !country || !destinationPort || !quantity || !price || !status || !paymentStatus || !invoiceNumber || !productId) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
@@ -150,8 +155,10 @@ export default function ExportsPage() {
       destinationCountry: country,
       destinationPort,
       quantity,
+      price,
       exportDate: Timestamp.now(),
       status,
+      paymentStatus,
       invoiceNumber,
       productId,
     };
@@ -176,15 +183,18 @@ export default function ExportsPage() {
     }
     const formData = new FormData(event.currentTarget);
     const newStatus = formData.get('status') as ExportStatus;
+    const newPaymentStatus = formData.get('paymentStatus') as PaymentStatus;
 
-    if (!newStatus) {
+
+    if (!newStatus || !newPaymentStatus) {
         toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a status.' });
         return;
     }
-
+    
     const exportRef = doc(firestore, 'exports', selectedExport.id);
 
-    // If status is changing to 'Completed', update stock
+    const updatePayload: { status: ExportStatus, paymentStatus: PaymentStatus } = { status: newStatus, paymentStatus: newPaymentStatus };
+
     if (newStatus === 'Completed' && selectedExport.status !== 'Completed') {
       const productRef = doc(firestore, 'products', selectedExport.productId);
       
@@ -202,7 +212,7 @@ export default function ExportsPage() {
 
           const newQuantity = currentQuantity - selectedExport.quantity;
           transaction.update(productRef, { quantity: newQuantity });
-          transaction.update(exportRef, { status: newStatus });
+          transaction.update(exportRef, updatePayload);
         });
         
         toast({
@@ -216,10 +226,10 @@ export default function ExportsPage() {
         return;
       }
     } else {
-       updateDocumentNonBlocking(exportRef, { status: newStatus });
+       updateDocumentNonBlocking(exportRef, updatePayload);
        toast({
-          title: "Status Updated",
-          description: `Order status has been updated to "${newStatus}".`,
+          title: "Order Updated",
+          description: `Order has been updated.`,
       });
     }
 
@@ -262,12 +272,13 @@ export default function ExportsPage() {
       exp.destinationCountry,
       format(exp.exportDate.toDate(), 'PP'),
       exp.status,
-      `${exp.quantity.toLocaleString()}`
+      exp.paymentStatus,
+      `$${(exp.quantity * exp.price).toLocaleString()}`
     ]);
 
     autoTable(doc, {
       startY: 45,
-      head: [['Client', 'Product', 'Country', 'Date', 'Status', 'Quantity']],
+      head: [['Client', 'Product', 'Country', 'Date', 'Status', 'Payment', 'Total Value']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -276,7 +287,7 @@ export default function ExportsPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFont('PT Sans', 'bold');
     doc.setFontSize(14);
-    doc.text(`Total Export Quantity: ${totalValue.toLocaleString()}`, 14, finalY);
+    doc.text(`Total Export Value: $${totalValue.toLocaleString()}`, 14, finalY);
 
     doc.save(`HuskTrack-Export-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
@@ -286,11 +297,15 @@ export default function ExportsPage() {
     });
   };
 
-  const statusBadgeVariant = (status: ExportStatus) => {
+  const statusBadgeVariant = (status: ExportStatus | PaymentStatus) => {
     switch (status) {
-        case 'Completed': return 'default';
+        case 'Completed':
+        case 'Paid':
+            return 'default';
         case 'In Progress': return 'secondary';
-        case 'To-do': return 'destructive';
+        case 'To-do':
+        case 'Pending':
+            return 'destructive';
         default: return 'outline';
     }
   }
@@ -304,7 +319,7 @@ export default function ExportsPage() {
         <div className="flex gap-2 flex-wrap justify-end">
            <Popover>
               <PopoverTrigger asChild>
-                <Button variant={'outline'} className={cn('w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
+                <Button variant={'outline'} className={cn('w-full sm:w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}</> : format(dateRange.from, 'LLL dd, y')) : <span>Filter by date...</span>}
                 </Button>
@@ -314,12 +329,23 @@ export default function ExportsPage() {
               </PopoverContent>
             </Popover>
              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ExportStatus | 'all')}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by status..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 {exportStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+             <Select value={paymentStatusFilter} onValueChange={(value) => setPaymentStatusFilter(value as PaymentStatus | 'all')}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by payment..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                {paymentStatuses.map(status => (
                   <SelectItem key={status} value={status}>{status}</SelectItem>
                 ))}
               </SelectContent>
@@ -385,7 +411,7 @@ export default function ExportsPage() {
                       <Input id="destinationPort" name="destinationPort" placeholder="e.g., Hamburg" required />
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
+                        <Label htmlFor="status">Order Status</Label>
                         <Select name="status" defaultValue="To-do" required>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
@@ -398,12 +424,29 @@ export default function ExportsPage() {
                         </Select>
                     </div>
                      <div className="space-y-2">
+                        <Label htmlFor="paymentStatus">Payment Status</Label>
+                        <Select name="paymentStatus" defaultValue="Pending" required>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select payment status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {paymentStatuses.map(status => (
+                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
                       <Label htmlFor="invoiceNumber">Invoice Number</Label>
                       <Input id="invoiceNumber" name="invoiceNumber" placeholder="INV-12345" required />
                     </div>
-                    <div className="space-y-2 sm:col-span-2">
+                    <div className="space-y-2">
                       <Label htmlFor="quantity">Quantity</Label>
                       <Input id="quantity" name="quantity" type="number" placeholder="5000" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Price Per Unit</Label>
+                      <Input id="price" name="price" type="number" step="0.01" placeholder="0.30" required />
                     </div>
                   </div>
                   <DialogFooter>
@@ -423,10 +466,10 @@ export default function ExportsPage() {
               <TableRow>
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden sm:table-cell">Product</TableHead>
-                <TableHead className="hidden sm:table-cell">Destination</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
+                <TableHead className="hidden md:table-cell">Payment</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
                 <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
@@ -449,14 +492,14 @@ export default function ExportsPage() {
                     <TableCell className="hidden sm:table-cell">
                       {productsMap.get(exp.productId as any)?.name || 'N/A'}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {exp.destinationCountry} ({exp.destinationPort})
-                    </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(exp.status)}>{exp.status}</Badge>
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant={statusBadgeVariant(exp.paymentStatus)}>{exp.paymentStatus}</Badge>
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">{format(exp.exportDate.toDate(), 'PP')}</TableCell>
-                    <TableCell className="text-right">{exp.quantity.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">${(exp.quantity * exp.price).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedExport(exp); setEditDialogOpen(true); }}>
                             <Edit className="h-4 w-4" />
@@ -481,15 +524,15 @@ export default function ExportsPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Order Status</DialogTitle>
+            <DialogTitle>Edit Order</DialogTitle>
             <DialogDescription>
-              Update the status for the order for client {selectedExport?.clientName}.
+              Update the order for client {selectedExport?.clientName}.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditStatus}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-status">Status</Label>
+                <Label htmlFor="edit-status">Order Status</Label>
                 <Select name="status" defaultValue={selectedExport?.status} required>
                   <SelectTrigger id="edit-status">
                     <SelectValue placeholder="Select status" />
@@ -501,9 +544,22 @@ export default function ExportsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-payment-status">Payment Status</Label>
+                <Select name="paymentStatus" defaultValue={selectedExport?.paymentStatus} required>
+                  <SelectTrigger id="edit-payment-status">
+                    <SelectValue placeholder="Select payment status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Update Status</Button>
+              <Button type="submit">Update Order</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,7 @@ import type { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import type { LocalSale, SaleStatus, Client, Product } from '@/lib/types';
+import type { LocalSale, SaleStatus, Client, Product, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { initialProducts } from '@/lib/data';
 
 const saleStatuses: SaleStatus[] = ['To-do', 'In Progress', 'Completed'];
+const paymentStatuses: PaymentStatus[] = ['Pending', 'Paid'];
 
 export default function LocalSalesPage() {
   const { toast } = useToast();
@@ -34,6 +35,7 @@ export default function LocalSalesPage() {
   const [selectedSale, setSelectedSale] = useState<LocalSale | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [statusFilter, setStatusFilter] = useState<SaleStatus | 'all'>('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | 'all'>('all');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
 
@@ -52,9 +54,29 @@ export default function LocalSalesPage() {
   const { data: sales, isLoading: isLoadingSales } = useCollection<LocalSale>(salesQuery);
   const { data: localClients, isLoading: isLoadingClients } = useCollection<Client>(localClientsQuery);
 
-  // Using static products data to avoid permission issues
-  const products: Product[] = initialProducts;
-  const isLoadingProducts = false;
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'), orderBy('name', 'asc'));
+  }, [firestore]);
+  
+  const { data: dbProducts, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  const products = useMemo(() => {
+    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, { ...p }]));
+    
+    if (dbProducts) {
+      dbProducts.forEach(dbProduct => {
+        if (initialProductMap.has(dbProduct.id)) {
+          const initialProduct = initialProductMap.get(dbProduct.id)!;
+          initialProduct.quantity = dbProduct.quantity;
+        } else {
+           initialProductMap.set(dbProduct.id, dbProduct);
+        }
+      });
+    }
+
+    return Array.from(initialProductMap.values());
+  }, [dbProducts]);
 
 
   const productsMap = useMemo(() => {
@@ -75,13 +97,14 @@ export default function LocalSalesPage() {
       })();
 
       const hasStatus = statusFilter === 'all' || sale.status === statusFilter;
+      const hasPaymentStatus = paymentStatusFilter === 'all' || sale.paymentStatus === paymentStatusFilter;
       
-      return isInDateRange && hasStatus;
+      return isInDateRange && hasStatus && hasPaymentStatus;
     });
-  }, [sales, dateRange, statusFilter]);
+  }, [sales, dateRange, statusFilter, paymentStatusFilter]);
 
   const totalValue = useMemo(() => {
-    return filteredSales.reduce((acc, sale) => acc + sale.quantity, 0);
+    return filteredSales.reduce((acc, sale) => acc + (sale.quantity * sale.price), 0);
   }, [filteredSales]);
 
 
@@ -95,11 +118,13 @@ export default function LocalSalesPage() {
     const formData = new FormData(event.currentTarget);
     const clientId = formData.get('clientId') as string;
     const quantity = parseFloat(formData.get('quantity') as string);
+    const price = parseFloat(formData.get('price') as string);
     const status = formData.get('status') as SaleStatus;
+    const paymentStatus = formData.get('paymentStatus') as PaymentStatus;
     const invoiceNumber = formData.get('invoiceNumber') as string;
     const productId = formData.get('productId') as string;
     
-    if (!clientId || !quantity || !status || !invoiceNumber || !productId) {
+    if (!clientId || !quantity || !price || !status || !paymentStatus || !invoiceNumber || !productId) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
@@ -115,8 +140,10 @@ export default function LocalSalesPage() {
       clientId: client.id,
       clientName: client.companyName,
       quantity,
+      price,
       saleDate: Timestamp.now(),
       status,
+      paymentStatus,
       invoiceNumber,
       productId,
     };
@@ -140,13 +167,15 @@ export default function LocalSalesPage() {
     }
     const formData = new FormData(event.currentTarget);
     const newStatus = formData.get('status') as SaleStatus;
+    const newPaymentStatus = formData.get('paymentStatus') as PaymentStatus;
 
-    if (!newStatus) {
-        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a status.' });
+    if (!newStatus || !newPaymentStatus) {
+        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select both statuses.' });
         return;
     }
 
     const saleRef = doc(firestore, 'local_sales', selectedSale.id);
+    const updatePayload = { status: newStatus, paymentStatus: newPaymentStatus };
 
     if (newStatus === 'Completed' && selectedSale.status !== 'Completed') {
       const productRef = doc(firestore, 'products', selectedSale.productId);
@@ -165,7 +194,7 @@ export default function LocalSalesPage() {
 
           const newQuantity = currentQuantity - selectedSale.quantity;
           transaction.update(productRef, { quantity: newQuantity });
-          transaction.update(saleRef, { status: newStatus });
+          transaction.update(saleRef, updatePayload);
         });
         
         toast({
@@ -179,10 +208,10 @@ export default function LocalSalesPage() {
         return;
       }
     } else {
-       updateDocumentNonBlocking(saleRef, { status: newStatus });
+       updateDocumentNonBlocking(saleRef, updatePayload);
        toast({
-          title: "Status Updated",
-          description: `Sale status has been updated to "${newStatus}".`,
+          title: "Sale Updated",
+          description: `Sale has been updated.`,
       });
     }
 
@@ -224,12 +253,13 @@ export default function LocalSalesPage() {
       productsMap.get(sale.productId as any)?.name || 'N/A',
       format(sale.saleDate.toDate(), 'PP'),
       sale.status,
-      `${sale.quantity.toLocaleString()}`
+      sale.paymentStatus,
+      `$${(sale.quantity * sale.price).toLocaleString()}`
     ]);
 
     autoTable(doc, {
       startY: 45,
-      head: [['Client', 'Product', 'Date', 'Status', 'Quantity']],
+      head: [['Client', 'Product', 'Date', 'Status', 'Payment', 'Total Value']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -238,7 +268,7 @@ export default function LocalSalesPage() {
     const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFont('PT Sans', 'bold');
     doc.setFontSize(14);
-    doc.text(`Total Sale Quantity: ${totalValue.toLocaleString()}`, 14, finalY);
+    doc.text(`Total Sale Value: $${totalValue.toLocaleString()}`, 14, finalY);
 
     doc.save(`HuskTrack-Local-Sales-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
@@ -248,11 +278,15 @@ export default function LocalSalesPage() {
     });
   };
 
-  const statusBadgeVariant = (status: SaleStatus) => {
+  const statusBadgeVariant = (status: SaleStatus | PaymentStatus) => {
     switch (status) {
-        case 'Completed': return 'default';
+        case 'Completed':
+        case 'Paid':
+            return 'default';
         case 'In Progress': return 'secondary';
-        case 'To-do': return 'destructive';
+        case 'To-do':
+        case 'Pending':
+            return 'destructive';
         default: return 'outline';
     }
   }
@@ -266,7 +300,7 @@ export default function LocalSalesPage() {
         <div className="flex gap-2 flex-wrap justify-end">
            <Popover>
               <PopoverTrigger asChild>
-                <Button variant={'outline'} className={cn('w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
+                <Button variant={'outline'} className={cn('w-full sm:w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}</> : format(dateRange.from, 'LLL dd, y')) : <span>Filter by date...</span>}
                 </Button>
@@ -276,12 +310,23 @@ export default function LocalSalesPage() {
               </PopoverContent>
             </Popover>
              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SaleStatus | 'all')}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by status..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 {saleStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={paymentStatusFilter} onValueChange={(value) => setPaymentStatusFilter(value as PaymentStatus | 'all')}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by payment..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                {paymentStatuses.map(status => (
                   <SelectItem key={status} value={status}>{status}</SelectItem>
                 ))}
               </SelectContent>
@@ -331,14 +376,14 @@ export default function LocalSalesPage() {
                                 <SelectValue placeholder="Select a product" />
                             </SelectTrigger>
                             <SelectContent>
-                                {initialProducts.map(product => (
+                                {products.map(product => (
                                     <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
+                        <Label htmlFor="status">Order Status</Label>
                         <Select name="status" defaultValue="To-do" required>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
@@ -350,13 +395,30 @@ export default function LocalSalesPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="paymentStatus">Payment Status</Label>
+                        <Select name="paymentStatus" defaultValue="Pending" required>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select payment status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {paymentStatuses.map(status => (
+                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                      <div className="space-y-2">
                       <Label htmlFor="invoiceNumber">Invoice Number</Label>
                       <Input id="invoiceNumber" name="invoiceNumber" placeholder="INV-12345" required />
                     </div>
-                    <div className="space-y-2 sm:col-span-2">
+                    <div className="space-y-2">
                       <Label htmlFor="quantity">Quantity</Label>
                       <Input id="quantity" name="quantity" type="number" placeholder="500" required />
+                    </div>
+                     <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="price">Price Per Unit</Label>
+                      <Input id="price" name="price" type="number" step="0.01" placeholder="0.25" required />
                     </div>
                   </div>
                   <DialogFooter>
@@ -377,16 +439,17 @@ export default function LocalSalesPage() {
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden sm:table-cell">Product</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
+                <TableHead className="hidden md:table-cell">Payment</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
                 <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                   <>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   </>
               )}
               {!isLoading && filteredSales.length > 0 ? (
@@ -404,8 +467,11 @@ export default function LocalSalesPage() {
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusBadgeVariant(sale.status)}>{sale.status}</Badge>
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant={statusBadgeVariant(sale.paymentStatus)}>{sale.paymentStatus}</Badge>
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">{format(sale.saleDate.toDate(), 'PP')}</TableCell>
-                    <TableCell className="text-right">{sale.quantity.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">${(sale.quantity * sale.price).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                        <Button variant="ghost" size="icon" onClick={() => { setSelectedSale(sale); setEditDialogOpen(true); }}>
                             <Edit className="h-4 w-4" />
@@ -416,7 +482,7 @@ export default function LocalSalesPage() {
                 ))
               ) : !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="text-center">
                     No local sales match your filters.
                   </TableCell>
                 </TableRow>
@@ -430,15 +496,15 @@ export default function LocalSalesPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Sale Status</DialogTitle>
+            <DialogTitle>Edit Sale</DialogTitle>
             <DialogDescription>
-              Update the status for the sale for client {selectedSale?.clientName}.
+              Update the sale for client {selectedSale?.clientName}.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditStatus}>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-status">Status</Label>
+               <div className="space-y-2">
+                <Label htmlFor="edit-status">Order Status</Label>
                 <Select name="status" defaultValue={selectedSale?.status} required>
                   <SelectTrigger id="edit-status">
                     <SelectValue placeholder="Select status" />
@@ -450,9 +516,22 @@ export default function LocalSalesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-payment-status">Payment Status</Label>
+                <Select name="paymentStatus" defaultValue={selectedSale?.paymentStatus} required>
+                  <SelectTrigger id="edit-payment-status">
+                    <SelectValue placeholder="Select payment status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Update Status</Button>
+              <Button type="submit">Update Sale</Button>
             </DialogFooter>
           </form>
         </DialogContent>

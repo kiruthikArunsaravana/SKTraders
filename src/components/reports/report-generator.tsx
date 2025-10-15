@@ -107,21 +107,23 @@ export default function ReportGenerator() {
     const doc = new jsPDF();
     const productsMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
 
-    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const paidExports = exports.filter(e => e.paymentStatus === 'Paid');
+    const paidLocalSales = localSales.filter(s => s.paymentStatus === 'Paid');
+    const pendingExports = exports.filter(e => e.paymentStatus === 'Pending');
+    const pendingLocalSales = localSales.filter(s => s.paymentStatus === 'Pending');
+
+    const totalIncomeFromClients = paidExports.reduce((sum, exp) => sum + (exp.quantity * exp.price), 0) +
+                                   paidLocalSales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
+
+    const totalOtherIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalIncome = totalIncomeFromClients + totalOtherIncome;
+
     const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Math.abs(t.amount), 0);
     const netProfit = totalIncome - totalExpenses;
 
-    const totalExportAmount = exports.reduce((sum, exp) => {
-      const product = productsMap.get(exp.productId);
-      return sum + (exp.quantity * (product?.sellingPrice || 0));
-    }, 0);
-
-    const totalLocalSalesAmount = localSales.reduce((sum, sale) => {
-      const product = productsMap.get(sale.productId);
-      return sum + (sale.quantity * (product?.sellingPrice || 0));
-    }, 0);
+    const totalExportAmount = exports.reduce((sum, exp) => sum + (exp.quantity * exp.price), 0);
+    const totalLocalSalesAmount = localSales.reduce((sum, sale) => sum + (sale.quantity * sale.price), 0);
     
-    // Assumption: "stocks created" are husk purchases, which are recorded as expenses.
     const totalStockCreated = transactions
       .filter(t => t.type === 'expense' && t.category === 'Husk')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
@@ -152,11 +154,12 @@ export default function ReportGenerator() {
     finalY += 8;
 
     const summaryData = [
-        ['Total Income', `$${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Income (from paid sales)', `$${totalIncomeFromClients.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Other Income', `$${totalOtherIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Expenses', `$${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Net Profit / Loss', `$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Export Value', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Total Local Sales Value', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Export Value (Paid & Pending)', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Local Sales Value (Paid & Pending)', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Raw Husk Purchased', `$${totalStockCreated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
     ];
 
@@ -193,11 +196,39 @@ export default function ReportGenerator() {
         finalY = (doc as any).lastAutoTable.finalY + 10;
     }
 
+    // Pending Payments
+    const pendingPaymentsData = [
+        ...pendingExports.map(e => ({ client: e.clientName, amount: e.quantity * e.price, type: 'Export' })),
+        ...pendingLocalSales.map(s => ({ client: s.clientName, amount: s.quantity * s.price, type: 'Local' }))
+    ];
+
+    if (pendingPaymentsData.length > 0) {
+      doc.setFontSize(16);
+      doc.setFont('Playfair Display', 'bold');
+      doc.text('Pending Payments (Accounts Receivable)', 14, finalY);
+      finalY += 8;
+
+      const pendingTableData = pendingPaymentsData.map(p => [
+        p.client,
+        p.type,
+        `$${p.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+
+      autoTable(doc, {
+        startY: finalY,
+        head: [['Client Name', 'Sale Type', 'Amount Due']],
+        body: pendingTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [200, 100, 100] },
+      });
+      finalY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
 
     if(transactions.length > 0) {
         doc.setFontSize(16);
         doc.setFont('Playfair Display', 'bold');
-        doc.text('Detailed Transactions', 14, finalY);
+        doc.text('Detailed Other Transactions', 14, finalY);
         finalY += 8;
 
         const tableData = transactions.map(t => {

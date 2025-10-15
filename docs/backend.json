@@ -354,6 +354,11 @@
         "price": {
           "type": "number",
           "description": "Product price."
+        },
+        "paymentStatus": {
+            "type": "string",
+            "description": "The payment status of the order.",
+            "enum": ["Pending", "Paid"]
         }
       },
       "required": [
@@ -398,6 +403,10 @@
           "type": "number",
           "description": "Product Quantity."
         },
+        "price": {
+            "type": "number",
+            "description": "Price per unit for the sale."
+        },
         "invoiceNumber": {
           "type": "string",
           "description": "Invoice number for the sale."
@@ -405,6 +414,11 @@
         "status": {
           "type": "string",
           "description": "The status of the sale."
+        },
+        "paymentStatus": {
+            "type": "string",
+            "description": "The payment status of the sale.",
+            "enum": ["Pending", "Paid"]
         }
       },
       "required": [
@@ -414,8 +428,10 @@
         "date",
         "productId",
         "quantity",
+        "price",
         "invoiceNumber",
-        "status"
+        "status",
+        "paymentStatus"
       ]
     },
      "FinancialTransaction": {
@@ -640,4 +656,3 @@
     "reasoning": "The Firestore structure is designed to reflect the core entities of the HuskTrack system and enforce robust security rules. Key design decisions prioritize authorization independence through denormalization and structural segregation for simplified rules and scalable security.  \n\n1.  **Authorization Independence (Denormalization):**\n    *   User roles are stored directly in the `/users/{userId}` document. This avoids the need for `get()` calls to determine a user's role during other operations. All other entities that require role based access depend on the uid which is provided by `request.auth.uid` and its comparison with roles present in each entity.\n\n2.  **Structural Segregation:**\n    *   The structure segregates data based on ownership and access requirements. User-specific data resides under `/users/{userId}`, while global data like `/products` is stored at the root level.\n    *   This segregation simplifies security rules by ensuring that all documents within a collection share the same security posture. For example, only admins can modify product data, while users can only modify their own user documents.\n\n3.  **Access Modeling:**\n    *   **User-Owned Data:** The `/users/{userId}` collection follows the Path-Based Ownership model, granting users full control over their own data.\n    *   **Global Data:** The `/products`, `/clients` collections are accessible to users with appropriate roles (e.g., Admin for products, Manager/Admin for clients).\n\n4. **QAPs (Rules are not Filters):**\n    * Role based access to product, sale, purchase, receipt, expense and export data enables secure `list` operations, as read operations are constrained to authorized users via `request.auth.uid` and its comparison with roles present in each entity."
   }
 }
-    
