@@ -23,6 +23,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/no
 import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { initialProducts } from '@/lib/data';
 
 const saleStatuses: SaleStatus[] = ['To-do', 'In Progress', 'Completed'];
 
@@ -338,8 +339,7 @@ export default function LocalSalesPage() {
                                 <SelectValue placeholder="Select a product" />
                             </SelectTrigger>
                             <SelectContent>
-                                {isLoadingProducts ? <SelectItem value="loading" disabled>Loading products...</SelectItem> :
-                                products?.map(product => (
+                                {initialProducts.map(product => (
                                     <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
                                 ))}
                             </SelectContent>
