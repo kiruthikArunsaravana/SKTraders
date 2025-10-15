@@ -356,7 +356,9 @@ export default function ExportsPage() {
         <CardHeader className="flex-row items-center justify-between">
           <div>
             <CardTitle>International Buyers</CardTitle>
-            <CardDescription>Record and manage your export orders.</CardDescription>
+            <CardDescription>
+              Record and manage your export orders. Showing {filteredExports.length} order(s).
+            </CardDescription>
           </div>
           <div className="flex gap-2">
             <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>

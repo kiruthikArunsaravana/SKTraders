@@ -337,7 +337,9 @@ export default function LocalSalesPage() {
         <CardHeader className="flex-row items-center justify-between">
           <div>
             <CardTitle>Local Buyers</CardTitle>
-            <CardDescription>Record and manage your local sales orders.</CardDescription>
+            <CardDescription>
+              Record and manage your local sales orders. Showing {filteredSales.length} order(s).
+            </CardDescription>
           </div>
           <div className="flex gap-2">
             <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
