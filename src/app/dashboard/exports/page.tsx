@@ -112,9 +112,9 @@ export default function ExportsPage() {
     const quantity = parseFloat(formData.get('quantity') as string);
     const status = formData.get('status') as ExportStatus;
     const invoiceNumber = formData.get('invoiceNumber') as string;
-    const productId = 'coco-pith'; // Defaulting for now
+    const productId = formData.get('productId') as string;
     
-    if (!clientId || !country || !destinationPort || !quantity || !status || !invoiceNumber) {
+    if (!clientId || !country || !destinationPort || !quantity || !status || !invoiceNumber || !productId) {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
@@ -175,12 +175,6 @@ export default function ExportsPage() {
     // If status is changing to 'Completed', update stock
     if (newStatus === 'Completed' && selectedExport.status !== 'Completed') {
       const productRef = doc(firestore, 'products', selectedExport.productId);
-      const product = productsMap.get(selectedExport.productId);
-      
-      if (!product || product.quantity < selectedExport.quantity) {
-        toast({ variant: 'destructive', title: 'Stock Alert', description: 'Cannot complete order, insufficient stock.' });
-        return;
-      }
       
       try {
         await runTransaction(firestore, async (transaction) => {
@@ -188,7 +182,13 @@ export default function ExportsPage() {
           if (!productDoc.exists()) {
             throw "Product document does not exist!";
           }
-          const newQuantity = productDoc.data().quantity - selectedExport.quantity;
+
+          const currentQuantity = productDoc.data().quantity;
+          if (currentQuantity < selectedExport.quantity) {
+             throw "Cannot complete order, insufficient stock.";
+          }
+
+          const newQuantity = currentQuantity - selectedExport.quantity;
           transaction.update(productRef, { quantity: newQuantity });
           transaction.update(exportRef, { status: newStatus });
         });
@@ -198,9 +198,9 @@ export default function ExportsPage() {
             description: `Order status updated to "Completed" and stock has been adjusted.`,
         });
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Transaction failed: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status and stock.' });
+        toast({ variant: 'destructive', title: 'Error', description: typeof error === 'string' ? error : 'Failed to update status and stock.' });
         return;
       }
     } else {
@@ -246,8 +246,8 @@ export default function ExportsPage() {
 
     const tableData = filteredExports.map((exp) => [
       exp.clientName,
+      productsMap.get(exp.productId)?.name || 'N/A',
       exp.destinationCountry,
-      exp.destinationPort,
       format(exp.exportDate.toDate(), 'PP'),
       exp.status,
       `${exp.quantity.toLocaleString()}`
@@ -255,7 +255,7 @@ export default function ExportsPage() {
 
     autoTable(doc, {
       startY: 45,
-      head: [['Client', 'Country', 'Port', 'Date', 'Status', 'Quantity']],
+      head: [['Client', 'Product', 'Country', 'Date', 'Status', 'Quantity']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 50, 80] },
@@ -327,7 +327,7 @@ export default function ExportsPage() {
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Order
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Add New Export Order</DialogTitle>
                   <DialogDescription>
@@ -335,7 +335,7 @@ export default function ExportsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddExportOrder}>
-                  <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="clientId">Client</Label>
                         <Select name="clientId" required onValueChange={setSelectedClientId}>
@@ -350,9 +350,23 @@ export default function ExportsPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="productId">Product</Label>
+                        <Select name="productId" required>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {isLoadingProducts ? <SelectItem value="loading" disabled>Loading products...</SelectItem> :
+                                products?.map(product => (
+                                    <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="destinationCountry">Country</Label>
-                      <Input id="destinationCountry" name="destinationCountry" value={destinationCountry} onChange={(e) => setDestinationCountry(e.target.value)} placeholder="e.g., Germany" required />
+                      <Input id="destinationCountry" name="destinationCountry" value={destinationCountry} onChange={(e) => setDestinationCountry(e.target.value)} placeholder="e.g., Germany" required readOnly/>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="destinationPort">Port</Label>
@@ -375,7 +389,7 @@ export default function ExportsPage() {
                       <Label htmlFor="invoiceNumber">Invoice Number</Label>
                       <Input id="invoiceNumber" name="invoiceNumber" placeholder="INV-12345" required />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label htmlFor="quantity">Quantity</Label>
                       <Input id="quantity" name="quantity" type="number" placeholder="5000" required />
                     </div>
@@ -396,6 +410,7 @@ export default function ExportsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
+                <TableHead className="hidden sm:table-cell">Product</TableHead>
                 <TableHead className="hidden sm:table-cell">Destination</TableHead>
                 <TableHead className="hidden md:table-cell">Status</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
@@ -406,8 +421,8 @@ export default function ExportsPage() {
             <TableBody>
               {isLoading && (
                   <>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   </>
               )}
               {!isLoading && filteredExports.length > 0 ? (
@@ -418,6 +433,9 @@ export default function ExportsPage() {
                       <div className="hidden text-sm text-muted-foreground md:inline">
                         INV: {exp.invoiceNumber}
                       </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {productsMap.get(exp.productId)?.name || 'N/A'}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {exp.destinationCountry} ({exp.destinationPort})
@@ -437,7 +455,7 @@ export default function ExportsPage() {
                 ))
               ) : !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="text-center">
                     No export orders match your filters.
                   </TableCell>
                 </TableRow>
@@ -481,3 +499,5 @@ export default function ExportsPage() {
     </div>
   );
 }
+
+    
