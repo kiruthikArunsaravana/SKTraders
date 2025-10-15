@@ -122,6 +122,9 @@ export default function ReportGenerator() {
 
     const totalExportAmount = exports.reduce((sum, exp) => sum + exp.quantity * exp.price, 0);
     const totalLocalSalesAmount = localSales.reduce((sum, sale) => sum + sale.quantity * sale.price, 0);
+    const totalHuskPurchaseAmount = transactions
+      .filter(t => t.type === 'expense' && t.category === 'Husk')
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const productSales: { [key: string]: number } = {};
     [...localSales, ...exports].forEach(sale => {
@@ -154,6 +157,7 @@ export default function ReportGenerator() {
         ['Net Profit / Loss', `$${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Export Value (All Statuses)', `$${totalExportAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
         ['Total Local Sales Value (All Statuses)', `$${totalLocalSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+        ['Total Raw Husk Purchased Amount', `$${totalHuskPurchaseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
     ];
 
     autoTable(doc, {
