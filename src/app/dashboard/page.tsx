@@ -28,7 +28,7 @@ import {
 } from 'recharts';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { FinancialTransaction, Export, Product } from '@/lib/types';
+import type { FinancialTransaction, Export, Product, LocalSale } from '@/lib/types';
 import { useMemo } from 'react';
 import {
   startOfMonth,
@@ -37,7 +37,7 @@ import {
   format,
   isWithinInterval,
 } from 'date-fns';
-import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
@@ -66,6 +66,12 @@ export default function DashboardPage() {
     return query(collection(firestore, 'exports'), orderBy('exportDate', 'desc'));
   }, [firestore]);
 
+  const localSalesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'local_sales'), orderBy('saleDate', 'desc'));
+  }, [firestore]);
+
+
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'products'));
@@ -78,6 +84,8 @@ export default function DashboardPage() {
     useCollection<FinancialTransaction>(recentTransactionsQuery);
   const { data: allExports, isLoading: isLoadingExports } =
     useCollection<Export>(exportsQuery);
+  const { data: allLocalSales, isLoading: isLoadingLocalSales } =
+    useCollection<LocalSale>(localSalesQuery);
   const { data: products, isLoading: isLoadingProducts } =
     useCollection<Product>(productsQuery);
 
@@ -87,17 +95,23 @@ export default function DashboardPage() {
     totalExpenses,
     expenseChange,
     exportValue,
+    localSaleValue,
     topProduct,
+    topInternationalClient,
+    topLocalClient,
     chartData,
   } = useMemo(() => {
-    if (!allTransactions || !allExports || !products) {
+    if (!allTransactions || !allExports || !allLocalSales || !products) {
       return {
         totalRevenue: 0,
         revenueChange: 0,
         totalExpenses: 0,
         expenseChange: 0,
         exportValue: 0,
+        localSaleValue: 0,
         topProduct: { name: 'N/A', units: 0 },
+        topInternationalClient: { name: 'N/A', value: 0 },
+        topLocalClient: { name: 'N/A', value: 0 },
         chartData: [],
       };
     }
@@ -144,13 +158,42 @@ export default function DashboardPage() {
     const productsMap = new Map(products.map(p => [p.id, p]));
 
     // Process exports
+    const clientExportValues = new Map<string, {name: string, value: number}>();
     const currentMonthExportValue = allExports
       .filter(e => isWithinInterval(e.exportDate.toDate(), currentMonthInterval))
       .reduce((acc, e) => {
         const product = productsMap.get(e.productId);
         const price = product ? product.sellingPrice : 0;
-        return acc + e.quantity * price;
+        const saleValue = e.quantity * price;
+
+        const clientRecord = clientExportValues.get(e.clientId) || { name: e.clientName, value: 0 };
+        clientRecord.value += saleValue;
+        clientExportValues.set(e.clientId, clientRecord);
+
+        return acc + saleValue;
       }, 0);
+
+     // Process local sales
+    const clientLocalSaleValues = new Map<string, {name: string, value: number}>();
+    const currentMonthLocalSaleValue = allLocalSales
+      .filter(s => isWithinInterval(s.saleDate.toDate(), currentMonthInterval))
+      .reduce((acc, s) => {
+        const product = productsMap.get(s.productId);
+        const price = product ? product.sellingPrice : 0;
+        const saleValue = s.quantity * price;
+
+        const clientRecord = clientLocalSaleValues.get(s.clientId) || { name: s.clientName, value: 0 };
+        clientRecord.value += saleValue;
+        clientLocalSaleValues.set(s.clientId, clientRecord);
+        
+        return acc + saleValue;
+      }, 0);
+
+    // Determine top clients
+    const topInternational = [...clientExportValues.values()].sort((a,b) => b.value - a.value)[0];
+    const topLocal = [...clientLocalSaleValues.values()].sort((a,b) => b.value - a.value)[0];
+    const topInternationalClient = topInternational ? { name: topInternational.name, value: topInternational.value } : { name: 'N/A', value: 0 };
+    const topLocalClient = topLocal ? { name: topLocal.name, value: topLocal.value } : { name: 'N/A', value: 0 };
 
 
     // Determine top product
@@ -188,12 +231,15 @@ export default function DashboardPage() {
       totalExpenses: currentMonthExpenses,
       expenseChange,
       exportValue: currentMonthExportValue,
+      localSaleValue: currentMonthLocalSaleValue,
       topProduct,
+      topInternationalClient,
+      topLocalClient,
       chartData: Array.from(monthMap.values()),
     };
-  }, [allTransactions, allExports, products]);
+  }, [allTransactions, allExports, allLocalSales, products]);
 
-  const isLoading = isLoadingTransactions || isLoadingExports || isLoadingRecent || isLoadingProducts;
+  const isLoading = isLoadingTransactions || isLoadingExports || isLoadingRecent || isLoadingProducts || isLoadingLocalSales;
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -201,8 +247,8 @@ export default function DashboardPage() {
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? <Skeleton className="h-32" /> : <Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -216,7 +262,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>}
 
-        {isLoading ? <Skeleton className="h-32" /> :<Card>
+        {isLoading ? <Skeleton className="h-32" /> :<Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -230,7 +276,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>}
 
-        {isLoading ? <Skeleton className="h-32" /> : <Card>
+        {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Top Product</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
@@ -243,7 +289,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>}
         
-        {isLoading ? <Skeleton className="h-32" /> : <Card>
+        {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Export Value</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -251,6 +297,41 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">${exportValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">In the current month</p>
+          </CardContent>
+        </Card>}
+        
+        {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Local Sale Value</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${localSaleValue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">In the current month</p>
+          </CardContent>
+        </Card>}
+         {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Top Int'l Client</CardTitle>
+            <UserIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold truncate">{topInternationalClient.name}</div>
+            <p className="text-xs text-muted-foreground">
+              ${topInternationalClient.value.toLocaleString()} this month
+            </p>
+          </CardContent>
+        </Card>}
+         {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Top Local Client</CardTitle>
+            <UserIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold truncate">{topLocalClient.name}</div>
+            <p className="text-xs text-muted-foreground">
+              ${topLocalClient.value.toLocaleString()} this month
+            </p>
           </CardContent>
         </Card>}
       </div>
