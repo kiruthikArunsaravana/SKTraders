@@ -35,23 +35,29 @@ export default function StockPage() {
     return query(collection(firestore, 'products'), orderBy('name', 'asc'));
   }, [firestore]);
 
-  const { data: products, isLoading } = useCollection<Omit<Product, 'id' | 'icon'>>(productsQuery);
+  const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
   const productsWithIcons = useMemo(() => {
-    // Start with the static initialProducts to ensure the UI has something to show even before Firestore loads
-    const productMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
-
-    // Update with data from Firestore once it loads
+    // Create a map of initial products for easy lookup
+    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, p]));
+    
+    // If firestore data is available, update the quantities
     if (products) {
       products.forEach(dbProduct => {
-        const existingProduct = productMap.get(dbProduct.id);
-        if (existingProduct) {
-          productMap.set(dbProduct.id, { ...existingProduct, ...dbProduct });
+        if (initialProductMap.has(dbProduct.id)) {
+          const initialProduct = initialProductMap.get(dbProduct.id)!;
+          initialProductMap.set(dbProduct.id, {
+            ...initialProduct,
+            quantity: dbProduct.quantity,
+          });
+        } else {
+           // This case handles products that might be in Firestore but not in initialProducts
+           initialProductMap.set(dbProduct.id, dbProduct);
         }
       });
     }
-    
-    return Array.from(productMap.values()).map(p => ({
+
+    return Array.from(initialProductMap.values()).map(p => ({
       ...p,
       icon: productIcons[p.id as keyof typeof productIcons] || Box
     }));
@@ -217,3 +223,5 @@ export default function StockPage() {
     </div>
   );
 }
+
+    
