@@ -1,29 +1,25 @@
 /**
- * @fileoverview Firestore Security Rules for HuskTrack application.
+ * @fileoverview Firestore Security Rules for HuskTrack system.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model, granting specific
- * permissions based on the user's role (Admin, Manager, Employee). It also implements 
- * ownership-based access for user profiles.
+ * This ruleset enforces a role-based access control model, with ownership for user profiles.
+ * Admins have broad access, while managers and employees have restricted access.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, with 'role' denormalized for authorization.
- * - /clients/{clientId}: Stores client information.
- * - /products/{productId}: Stores product information.
- * - /stocks/{stockId}: Stores stock information.
- * - /sales/{saleId}: Stores sales transaction data.
- * - /purchases/{purchaseId}: Stores purchase transaction data.
- * - /receipts/{receiptId}: Stores receipt information.
- * - /expenses/{expenseId}: Stores expense data.
- * - /exports/{exportId}: Stores export order details.
+ * - /users/{userId}: Stores user profiles; access controlled by user ID.
+ * - /clients/{clientId}: Stores client information; access controlled by role.
+ * - /products/{productId}: Stores product information; access controlled by role.
+ * - /stocks/{stockId}: Stores stock information; access controlled by role.
+ * - /sales/{saleId}: Stores sales transaction data; access controlled by role.
+ * - /purchases/{purchaseId}: Stores purchase data; access controlled by role.
+ * - /receipts/{receiptId}: Stores receipt data; access controlled by role.
+ * - /expenses/{expenseId}: Stores expense data; access controlled by role.
+ * - /exports/{exportId}: Stores export data; access controlled by role.
  *
  * Key Security Decisions:
- * - Strict role-based access control for all collections except /users.
- * - Users can only manage their own profiles (/users/{userId}).
- * - No listing of the /users collection is allowed.
- *
- * Denormalization for Authorization:
- * - User roles are denormalized into the /users/{userId} document, avoiding costly `get()` calls.
+ * - Users can only manage their own profiles.
+ * - Listing of financial transaction data is restricted based on role.
+ * - Data validation is limited to authorization-critical fields.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -37,188 +33,275 @@ service cloud.firestore {
     }
 
     /**
-     * @description Checks if the user's ID matches the requested user ID.
+     * @description Checks if the user is the owner of the resource.
      */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the user is an Admin.
-     */
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.role == 'Admin';
-    }
-
-    /**
-     * @description Checks if the user is a Manager.
-     */
-    function isManager() {
-      return isSignedIn() && request.auth.token.role == 'Manager';
-    }
-    
-    /**
-     * @description Checks if the user is an Employee.
-     */
-    function isEmployee() {
-      return isSignedIn() && request.auth.token.role == 'Employee';
-    }
-
-    /**
-     * @description Checks if the user is the owner and the resource exists.
+     * @description Checks if the user is an existing owner of the resource.
+     * Ensures the document exists before checking ownership.
      */
     function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-    }    
+      return (isOwner(userId) && resource != null);
+    }
 
     /**
-     * @description Security rules for /users/{userId} collection.
+     * @description Checks if the user has the 'Admin' role.
+     */
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    /**
+     * @description Checks if the user has the 'Manager' role.
+     */
+    function isManager() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Manager';
+    }
+
+    /**
+     * @description Checks if the user has the 'Employee' role.
+     */
+    function isEmployee() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Employee';
+    }
+
+    /**
+     * @description Security rules for /users/{userId} documents.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own profile if the userId matches their auth.uid.
-     * @allow (get, update, delete) - Authenticated user can read, update, or delete their own profile.
-     * @deny (create) - If the userId does not match the authenticated user's uid.
-     * @deny (list) - Listing of all users is not allowed.
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @allow (create) User with ID 'user123' can create their profile.
+     *          request.auth.uid: 'user123', request.resource.data.id: 'user123'
+     * @allow (get) User with ID 'user123' can retrieve their profile.
+     *          request.auth.uid: 'user123'
+     * @allow (update) User with ID 'user123' can update their profile.
+     *          request.auth.uid: 'user123'
+     * @deny (create) User with ID 'user456' cannot create a profile for 'user123'.
+     *         request.auth.uid: 'user456', request.resource.data.id: 'user123'
+     * @deny (update) User with ID 'user456' cannot update the profile of 'user123'.
+     *         request.auth.uid: 'user456'
+     * @deny (delete) Non-owner cannot delete the profile.
+     *         request.auth.uid: 'user456'
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-
-      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Security rules for /clients/{clientId} collection.
+     * @description Security rules for /clients/{clientId} documents.
      * @path /clients/{clientId}
-     * @allow (get, list) - Admins, Managers, and Employees can read all clients.
-     * @allow (create) - Only Admins and Managers can create new clients.
-     * @allow (update, delete) - Only Admins and Managers can update or delete clients.
-     * @deny (create) - Regular users cannot create clients.
-     * @principle Role-based access control for managing client information.
+     * @allow (create) Admin can create a new client.
+     *          User.role: 'Admin'
+     * @allow (get) Manager or Admin can retrieve client information.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update client information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new client.
+     *          User.role: 'Employee'
+     * @deny (update) Employee cannot update client information.
+     *          User.role: 'Employee'
+     * @deny (delete) Employee cannot delete client information.
+     *          User.role: 'Employee'
+     * @principle Restricts client management to authorized roles.
      */
     match /clients/{clientId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
-    }
-
-    /**
-     * @description Security rules for /products/{productId} collection.
-     * @path /products/{productId}
-     * @allow (get, list) - Anyone can read product information.
-     * @allow (create, update, delete) - Only Admins can create, update, or delete products.
-     * @deny (create) - Non-admins cannot create products.
-     * @principle Role-based access control for managing product catalog.
-     */
-    match /products/{productId} {
-      allow get, list: if true;
+      allow get, list: if isManager() || isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /stocks/{stockId} collection.
+     * @description Security rules for /products/{productId} documents.
+     * @path /products/{productId}
+     * @allow (create) Admin can create a new product.
+     *          User.role: 'Admin'
+     * @allow (get) Any signed-in user can retrieve product information.
+     *          isSignedIn(): true
+     * @allow (update) Admin can update product information.
+     *          User.role: 'Admin'
+     * @deny (create) Manager cannot create a new product.
+     *          User.role: 'Manager'
+     * @deny (update) Manager cannot update product information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete product information.
+     *          User.role: 'Manager'
+     * @principle Restricts product management to admins, allows public read access.
+     */
+    match /products/{productId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Security rules for /stocks/{stockId} documents.
      * @path /stocks/{stockId}
-     * @allow (get, list) - Admins, Managers and Employees can read stock information.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete stock information.
-     * @deny (create) - Regular users cannot create stock information.
-     * @principle Role-based access control for managing stock levels.
+     * @allow (create) Admin can create a new stock entry.
+     *          User.role: 'Admin'
+     * @allow (get) Manager or Admin can retrieve stock information.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update stock information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new stock entry.
+     *          User.role: 'Employee'
+     * @deny (update) Employee cannot update stock information.
+     *          User.role: 'Employee'
+     * @deny (delete) Employee cannot delete stock information.
+     *          User.role: 'Employee'
+     * @principle Restricts stock management to authorized roles.
      */
     match /stocks/{stockId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isManager() || isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /sales/{saleId} collection.
+     * @description Security rules for /sales/{saleId} documents.
      * @path /sales/{saleId}
-     * @allow (get, list) - Admins, Managers and Employees can read sale transactions.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete sales transactions.
-     * @deny (create) - Regular users cannot create sale transactions.
-     * @principle Role-based access control for managing sales transactions.
+     * @allow (create) Manager or Admin can create a new sale record.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (get) Employee, Manager, or Admin can retrieve sale information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update sale information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new sale record.
+     *          User.role: 'Employee'
+     * @deny (update) Manager cannot update sale information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete sale information.
+     *          User.role: 'Manager'
+     * @principle Restricts sale management to authorized roles.
      */
     match /sales/{saleId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isEmployee() || isManager() || isAdmin();
+      allow create: if isManager() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /purchases/{purchaseId} collection.
+     * @description Security rules for /purchases/{purchaseId} documents.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) - Admins, Managers and Employees can read purchase transactions.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete purchase transactions.
-     * @deny (create) - Regular users cannot create purchase transactions.
-     * @principle Role-based access control for managing purchase transactions.
+     * @allow (create) Manager or Admin can create a new purchase record.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (get) Employee, Manager, or Admin can retrieve purchase information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update purchase information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new purchase record.
+     *          User.role: 'Employee'
+     * @deny (update) Manager cannot update purchase information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete purchase information.
+     *          User.role: 'Manager'
+     * @principle Restricts purchase management to authorized roles.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isEmployee() || isManager() || isAdmin();
+      allow create: if isManager() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /receipts/{receiptId} collection.
+     * @description Security rules for /receipts/{receiptId} documents.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - Admins, Managers and Employees can read receipts.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete receipts.
-     * @deny (create) - Regular users cannot create receipts.
-     * @principle Role-based access control for managing receipts.
+     * @allow (create) Manager or Admin can create a new receipt.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (get) Employee, Manager, or Admin can retrieve receipt information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update receipt information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new receipt.
+     *          User.role: 'Employee'
+     * @deny (update) Manager cannot update receipt information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete receipt information.
+     *          User.role: 'Manager'
+     * @principle Restricts receipt management to authorized roles.
      */
     match /receipts/{receiptId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isEmployee() || isManager() || isAdmin();
+      allow create: if isManager() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /expenses/{expenseId} collection.
+     * @description Security rules for /expenses/{expenseId} documents.
      * @path /expenses/{expenseId}
-     * @allow (get, list) - Admins, Managers and Employees can read expenses.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete expenses.
-     * @deny (create) - Regular users cannot create expenses.
-     * @principle Role-based access control for managing expenses.
+     * @allow (create) Manager or Admin can create a new expense record.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (get) Employee, Manager, or Admin can retrieve expense information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update expense information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new expense record.
+     *          User.role: 'Employee'
+     * @deny (update) Manager cannot update expense information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete expense information.
+     *          User.role: 'Manager'
+     * @principle Restricts expense management to authorized roles.
      */
     match /expenses/{expenseId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isEmployee() || isManager() || isAdmin();
+      allow create: if isManager() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Security rules for /exports/{exportId} collection.
+     * @description Security rules for /exports/{exportId} documents.
      * @path /exports/{exportId}
-     * @allow (get, list) - Admins, Managers and Employees can read exports.
-     * @allow (create, update, delete) - Only Admins and Managers can create, update, or delete exports.
-     * @deny (create) - Regular users cannot create exports.
-     * @principle Role-based access control for managing exports.
+     * @allow (create) Manager or Admin can create a new export record.
+     *          User.role: 'Manager' or User.role: 'Admin'
+     * @allow (get) Employee, Manager, or Admin can retrieve export information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update export information.
+     *          User.role: 'Admin'
+     * @deny (create) Employee cannot create a new export record.
+     *          User.role: 'Employee'
+     * @deny (update) Manager cannot update export information.
+     *          User.role: 'Manager'
+     * @deny (delete) Manager cannot delete export information.
+     *          User.role: 'Manager'
+     * @principle Restricts export management to authorized roles.
      */
     match /exports/{exportId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get, list: if isEmployee() || isManager() || isAdmin();
+      allow create: if isManager() || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
-    
-    /**
-     * @description Missing required role for Financial Transactions
+
+        /**
+     * @description Security rules for /financial_transactions documents.
      * @path /financial_transactions
+     * @allow (get) Employee, Manager, or Admin can retrieve financial_transactions information.
+     *          User.role: 'Employee' or User.role: 'Manager' or User.role: 'Admin'
+     * @allow (update) Admin can update financial_transactions information.
+     *          User.role: 'Admin'
+     *  @deny (create) Anyone cannot create a financial_transactions
+     *
+     *  @deny (delete) Anyone cannot delete a financial_transactions
+     * @principle Restricts financial_transactions to authorized roles.
      */
-    match /financial_transactions/{transactionId} {
-      allow get, list: if isAdmin() || isManager() || isEmployee();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager(); // TODO: Add owner validation once the schema is updated with an ownership field.
-    }
+     match /financial_transactions {
+        allow get, list: if isEmployee() || isManager() || isAdmin();
+        allow create: if false;
+        allow update: if isAdmin();
+        allow delete: if false;
+     }
   }
 }
