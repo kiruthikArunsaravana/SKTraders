@@ -1,31 +1,29 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders App.
+ * @fileoverview Firestore Security Rules for SK Traders.
  *
  * Core Philosophy:
- * This ruleset prioritizes simplicity by delegating authorization to the backend, using Spring Security.
- * All collections are accessible for read and write operations, while role-based access control is managed on the server-side,
- * eliminating the need for complex security rules or data denormalization within Firestore.
+ * This ruleset provides baseline security for the SK Traders application, allowing all signed-in users full access to all data.
+ * Role-based access control is intended to be managed on the backend via Spring Security, simplifying these rules.
  *
  * Data Structure:
- * The database consists of top-level collections for clients, products, stocks, sales, purchases, receipts, expenses, and exports.
- * There are no user-specific subcollections.
+ * The Firestore database consists of top-level collections for core entities: 'clients', 'products', 'stocks', 'sales', 'purchases', 'receipts', 'expenses', and 'exports'.
+ * There is no user-specific data segregation within the database itself.
  *
  * Key Security Decisions:
- * - No user-specific security rules are enforced within Firestore.
- * - Role-based access control is exclusively handled on the backend, ensuring a centralized and manageable security strategy.
- * - All collections are accessible for read and write to any authenticated user, assuming that Spring Security will prevent unauthorized access.
+ * - Role-based access control is handled on the backend, not in the rules.
+ * - No user-specific ownership checks or data segregation is enforced within Firestore.
+ * - All authenticated users are granted full read and write access to all collections.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages access to client data. All authenticated users can read and write client documents.
+     * @description Allows any authenticated user to read and write client data.
      * @path /clients/{clientId}
-     * @allow (get, list) All authenticated users can retrieve and list client documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete client documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /clients/{clientId} {
       allow get, list: if isSignedIn();
@@ -33,12 +31,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to product data. All authenticated users can read and write product documents.
+     * @description Allows any authenticated user to read and write product data.
      * @path /products/{productId}
-     * @allow (get, list) All authenticated users can retrieve and list product documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete product documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /products/{productId} {
       allow get, list: if isSignedIn();
@@ -46,12 +43,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to stock data. All authenticated users can read and write stock documents.
+     * @description Allows any authenticated user to read and write stock data.
      * @path /stocks/{stockId}
-     * @allow (get, list) All authenticated users can retrieve and list stock documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete stock documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /stocks/{stockId} {
       allow get, list: if isSignedIn();
@@ -59,12 +55,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to sale data. All authenticated users can read and write sale documents.
+     * @description Allows any authenticated user to read and write sale data.
      * @path /sales/{saleId}
-     * @allow (get, list) All authenticated users can retrieve and list sale documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete sale documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /sales/{saleId} {
       allow get, list: if isSignedIn();
@@ -72,12 +67,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to purchase data. All authenticated users can read and write purchase documents.
+     * @description Allows any authenticated user to read and write purchase data.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) All authenticated users can retrieve and list purchase documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete purchase documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /purchases/{purchaseId} {
       allow get, list: if isSignedIn();
@@ -85,12 +79,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to receipt data. All authenticated users can read and write receipt documents.
+     * @description Allows any authenticated user to read and write receipt data.
      * @path /receipts/{receiptId}
-     * @allow (get, list) All authenticated users can retrieve and list receipt documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete receipt documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /receipts/{receiptId} {
       allow get, list: if isSignedIn();
@@ -98,12 +91,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to expense data. All authenticated users can read and write expense documents.
+     * @description Allows any authenticated user to read and write expense data.
      * @path /expenses/{expenseId}
-     * @allow (get, list) All authenticated users can retrieve and list expense documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete expense documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /expenses/{expenseId} {
       allow get, list: if isSignedIn();
@@ -111,21 +103,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to export data. All authenticated users can read and write export documents.
+     * @description Allows any authenticated user to read and write export data.
      * @path /exports/{exportId}
-     * @allow (get, list) All authenticated users can retrieve and list export documents.
-     * @allow (create, update, delete) All authenticated users can create, update, and delete export documents.
-     * @deny None. Access control is managed on the backend.
-     * @principle Access to all collections is open to authenticated users, with role-based access control managed on the backend.
+     * @allow (get, list, create, update, delete) - Any signed-in user.
+     * @deny None.
+     * @principle Grants full access to authenticated users for prototyping and defers role-based access control to the backend.
      */
     match /exports/{exportId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
 
-    // --- Helper Functions ---
     function isSignedIn() {
-      return request.auth != null;
+        return request.auth != null;
     }
   }
 }
