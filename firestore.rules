@@ -1,135 +1,143 @@
 /**
  * @file Firestore Security Rules for SK Traders
- * @core_philosophy This ruleset provides basic protection against unauthorized data access and modification.
- * It is designed to work in conjunction with server-side role-based access control, which handles the actual authorization.
- * All rules in this file are written to deny any operation that is not explicitly permitted by the server.
- * @data_structure The database consists of top-level collections for clients, products, stock, sales, purchases, receipts, expenses, and exports.
- * There is no user-specific data or subcollections.
- * @key_security_decisions All data access is controlled on the server-side via Spring Security. Therefore, these rules primarily act as a fallback to prevent unauthorized direct access to Firestore. No rules are implemented that rely on request.auth information.
- *  All write operations are denied by default.
+ * @core_philosophy This ruleset provides basic protection for SK Traders' Firestore data.
+ * All data is stored in top-level collections, with access primarily controlled on the backend.
+ * @data_structure The database consists of the following top-level collections: clients, products, stocks, sales, purchases, receipts, expenses, and exports.
+ * @key_security_decisions Role-based access control is managed on the backend, simplifying Firestore Security Rules.
+ * No authorization context is denormalized into subcollections.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the 'clients' collection.
+     * @description Defines a global function to check if a user is signed in.
+     * @returns true if the user is authenticated, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the request is made by the owner (user with matching UID).
+     * @param {string} userId - The user ID to check against.
+     * @returns true if the request.auth.uid matches the provided userId, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the request is made by the owner and the document exists.
+     * @param {string} userId - The user ID to check against.
+     * @returns true if the request.auth.uid matches the provided userId and the document exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for the /clients collection.
      * @path /clients/{clientId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read client data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects client data with basic authentication.
      */
     match /clients/{clientId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'products' collection.
+     * @description Rules for the /products collection.
      * @path /products/{productId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read product data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects product data with basic authentication.
      */
     match /products/{productId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'stocks' collection.
+     * @description Rules for the /stocks collection.
      * @path /stocks/{stockId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read stock data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects stock data with basic authentication.
      */
     match /stocks/{stockId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'sales' collection.
+     * @description Rules for the /sales collection.
      * @path /sales/{saleId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read sales data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects sales data with basic authentication.
      */
     match /sales/{saleId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'purchases' collection.
+     * @description Rules for the /purchases collection.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read purchases data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects purchase data with basic authentication.
      */
     match /purchases/{purchaseId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'receipts' collection.
+     * @description Rules for the /receipts collection.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read receipts data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects receipts data with basic authentication.
      */
     match /receipts/{receiptId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'expenses' collection.
+     * @description Rules for the /expenses collection.
      * @path /expenses/{expenseId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read expenses data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects expenses data with basic authentication.
      */
     match /expenses/{expenseId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to the 'exports' collection.
+     * @description Rules for the /exports collection.
      * @path /exports/{exportId}
-     * @allow (get, list) - Always denied, access controlled by backend
-     * @deny (create, update, delete) - Always denied
-     * @principle Server-side access control. Prevents any client-side data modification.
+     * @allow (get, list): Allows any signed-in user to read exports data.
+     * @allow (create, update, delete): Denies all write operations via rules. Write operations are managed via backend
+     * @deny (create) Request without authentication.
+     * @principle Protects exports data with basic authentication.
      */
     match /exports/{exportId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
   }
 }
