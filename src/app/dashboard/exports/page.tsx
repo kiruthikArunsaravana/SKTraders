@@ -136,12 +136,6 @@ export default function ExportsPage() {
        toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
        return;
     }
-
-    const product = productsMap.get(productId as any);
-    if (!product || product.quantity < quantity) {
-      toast({ variant: 'destructive', title: 'Stock Alert', description: `There are only ${product?.quantity || 0} units of ${product?.name} available.` });
-      return;
-    }
     
     const client = internationalClients?.find(c => c.id === clientId);
     if (!client) {
@@ -203,7 +197,7 @@ export default function ExportsPage() {
 
           const currentQuantity = productDoc.data().quantity;
           if (currentQuantity < selectedExport.quantity) {
-             throw "Cannot complete order, insufficient stock.";
+             throw `Cannot complete order, insufficient stock. Only ${currentQuantity} units available.`;
           }
 
           const newQuantity = currentQuantity - selectedExport.quantity;
