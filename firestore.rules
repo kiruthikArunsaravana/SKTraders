@@ -1,198 +1,153 @@
 /**
  * @fileoverview Firestore Security Rules for HuskTrack.
  *
- * Core Philosophy: This ruleset enforces a role-based access control model.
- *  Users can only manage their own profile data, while administrative roles
- *  (Admin, Manager) have broader access to business data.
+ * Core Philosophy: This ruleset prioritizes ease of access, allowing all authenticated users to read, modify, or perform any operation across all collections. This is for prototyping purposes only and should be revised for production.
  *
- * Data Structure:
- *  - /users/{userId}: Stores user profile information. Access is restricted to the owner.
- *  - /clients/{clientId}: Stores client information. Access is restricted to managers and admins.
- *  - /products/{productId}: Stores product information. Access is restricted to admins.
- *  - /stocks/{stockId}: Stores stock information. Access is restricted to managers and admins.
- *  - /sales/{saleId}: Stores sales transaction information. Access is restricted to managers and admins.
- *  - /purchases/{purchaseId}: Stores purchase transaction information. Access is restricted to managers and admins.
- *  - /receipts/{receiptId}: Stores receipt information. Access is restricted to managers and admins.
- *  - /expenses/{expenseId}: Stores expense information. Access is restricted to managers and admins.
- *  - /exports/{exportId}: Stores export information. Access is restricted to managers and admins.
- *  - /local_sales/{localSaleId}: Stores local sale information. Access is restricted to managers and admins.
- *  - /financial_transactions/{transactionId}: Stores financial transaction information. Access is restricted to managers and admins.
+ * Data Structure: Data is stored in top-level collections such as /users/{userId}, /clients/{clientId}, /products/{productId}, etc.
  *
  * Key Security Decisions:
- *  - Users can only create their own user document.
- *  - Users cannot list all users.
- *  - Write access to core business data (products, sales, purchases, etc.) is limited to privileged roles.
+ * - All authenticated users can read all documents.
+ * - All authenticated users can create, update, and delete all documents.
+ * - No data validation is performed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profile data, enforcing owner-only access.
+     * @description Allows any signed-in user to read and write user data.
      * @path /users/{userId}
-     * @allow (create) - Authenticated user can create their own profile.
-     * @allow (get, update, delete) - Authenticated user can access/modify their own profile.
-     * @deny (create) - If the user id doesnt match the authenticated user ID.
-     * @deny (get, update, delete) - If the user id doesnt match the authenticated user ID.
-     * @principle Enforces strict user ownership for profile data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /users/{userId} {
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // No listing of all users.
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages client data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write client data.
      * @path /clients/{clientId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for client data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /clients/{clientId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages product data, accessible only to Admins.
+     * @description Allows any signed-in user to read and write product data.
      * @path /products/{productId}
-     * @allow (get, list) - If the user is an Admin.
-     * @allow (create, update, delete) - If the user is an Admin.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin.
-     * @principle Role-based access control for product data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /products/{productId} {
-      allow get, list: if isSignedIn() && isAdmin();
-      allow create, update, delete: if isSignedIn() && isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages stock data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write stock data.
      * @path /stocks/{stockId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for stock data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /stocks/{stockId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages sales data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write sale data.
      * @path /sales/{saleId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for sales data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /sales/{saleId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages purchase data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write purchase data.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for purchase data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages receipt data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write receipt data.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for receipt data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /receipts/{receiptId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages expense data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write expense data.
      * @path /expenses/{expenseId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for expense data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /expenses/{expenseId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages export data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write export data.
      * @path /exports/{exportId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for export data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /exports/{exportId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Manages local sale data, accessible to Managers and Admins.
+     * @description Allows any signed-in user to read and write local_sales data.
      * @path /local_sales/{localSaleId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for local sale data.
+     * @allow (read, write): Any signed-in user can read or write.
+     * @deny (read, write): No denial conditions in this prototype.
+     * @principle Allows any signed-in user to read and write.
      */
     match /local_sales/{localSaleId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
-    /**
-     * @description Manages financial transaction data, accessible to Managers and Admins.
-     * @path /financial_transactions/{transactionId}
-     * @allow (get, list) - If the user is an Admin or Manager.
-     * @allow (create, update, delete) - If the user is an Admin or Manager.
-     * @deny (get, list, create, update, delete) - If the user is not an Admin or Manager.
-     * @principle Role-based access control for financial transaction data.
-     */
+     /**
+      * @description Allows any signed-in user to read and write financial transaction data.
+      * @path /financial_transactions/{transactionId}
+      * @allow (read, write): Any signed-in user can read or write.
+      * @deny (read, write): No denial conditions in this prototype.
+      * @principle Allows any signed-in user to read and write.
+      */
     match /financial_transactions/{transactionId} {
-      allow get, list: if isSignedIn() && (isAdmin() || isManager());
-      allow create, update, delete: if isSignedIn() && (isAdmin() || isManager());
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
-
   }
 
-  // Helper function to determine if the user is signed in.
   function isSignedIn() {
     return request.auth != null;
-  }
-
-  // Helper function to determine if the user is the owner of the document.
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
-
-   // Helper function to determine if the user is an Admin
-  function isAdmin() {
-      return request.auth.token.role == 'Admin';
-  }
-
-  // Helper function to determine if the user is a Manager
-  function isManager() {
-      return request.auth.token.role == 'Manager';
   }
 }
