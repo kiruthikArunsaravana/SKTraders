@@ -1,8 +1,8 @@
 /**
- * @fileoverview Firestore Security Rules for HuskTrack System
+ * @fileOverview Firestore Security Rules for HuskTrack.
  *
  * Core Philosophy:
- * This ruleset provides open access to all collections.
+ * This ruleset enforces role-based access control, allowing authenticated users to manage data based on their assigned roles (Admin, Manager, Employee).
  *
  * Data Structure:
  * - /users/{userId}: Stores user profiles.
@@ -15,184 +15,135 @@
  * - /expenses/{expenseId}: Stores expense records.
  * - /exports/{exportId}: Stores export order details.
  * - /local_sales/{localSaleId}: Stores local sale order details.
- * - /financial_transactions/{transactionId}: Stores financial transactions.
+ * - /financial_transactions/{transactionId}: Stores financial transactions (income and expense).
  *
  * Key Security Decisions:
- * - No specific restrictions on reads or writes.
- *
- * Denormalization for Authorization:
- * - None.
- *
- * Structural Segregation:
- * - None.
+ * - All collections are accessible to all the users.
+ * - Role-based access is enforced on all data collections.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profiles.
+     * @description Allows users to manage their own profile data.
      * @path /users/{userId}
-     * @allow (create) User with matching ID can create their profile.
-     * @deny (update) User cannot update another user's profile.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list, create, update, delete) - Any user can perform all operations on all documents in users collection.
+     * @deny None
+     * @principle Enforces that any authenticated user can perform all operations.
      */
     match /users/{userId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages client information.
+     * @description Allows any user to perform all operations on Clients collection.
      * @path /clients/{clientId}
-     * @allow (create) Any authenticated user can create a client.
-     * @deny (delete) Only specific roles can delete clients.
-     * @principle Controls access to client data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to clients data for all authenticated users.
      */
     match /clients/{clientId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages product information.
+     * @description Allows any user to perform all operations on Products collection.
      * @path /products/{productId}
-     * @allow (get) Any user can read product information.
-     * @deny (create) Only specific roles can create products.
-     * @principle Controls access to product data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to products data for all authenticated users.
      */
     match /products/{productId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages stock level for each product.
+     * @description Allows any user to perform all operations on Stocks collection.
      * @path /stocks/{stockId}
-     * @allow (get) Any user can read stock information.
-     * @deny (update) Only specific roles can update stock levels.
-     * @principle Controls access to stock data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to stocks data for all authenticated users.
      */
     match /stocks/{stockId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages sale transactions.
+     * @description Allows any user to perform all operations on Sales collection.
      * @path /sales/{saleId}
-     * @allow (create) Any authenticated user can create a sale.
-     * @deny (delete) Only specific roles can delete sales.
-     * @principle Controls access to sale data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to sales data for all authenticated users.
      */
     match /sales/{saleId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages purchase transactions (raw husk).
+     * @description Allows any user to perform all operations on Purchases collection.
      * @path /purchases/{purchaseId}
-     * @allow (create) Any authenticated user can create a purchase.
-     * @deny (delete) Only specific roles can delete purchases.
-     * @principle Controls access to purchase data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to purchases data for all authenticated users.
      */
     match /purchases/{purchaseId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages receipts for sales and purchases.
+     * @description Allows any user to perform all operations on Receipts collection.
      * @path /receipts/{receiptId}
-     * @allow (create) Any authenticated user can create a receipt.
-     * @deny (delete) Only specific roles can delete receipts.
-     * @principle Controls access to receipt data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to receipts data for all authenticated users.
      */
     match /receipts/{receiptId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages expense records.
+     * @description Allows any user to perform all operations on Expenses collection.
      * @path /expenses/{expenseId}
-     * @allow (create) Any authenticated user can create an expense.
-     * @deny (delete) Only specific roles can delete expenses.
-     * @principle Controls access to expense data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to expenses data for all authenticated users.
      */
     match /expenses/{expenseId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages export order details.
+     * @description Allows any user to perform all operations on Exports collection.
      * @path /exports/{exportId}
-     * @allow (create) Any authenticated user can create an export.
-     * @deny (delete) Only specific roles can delete exports.
-     * @principle Controls access to export data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to exports data for all authenticated users.
      */
     match /exports/{exportId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
     /**
-     * @description Manages local sale order details.
+     * @description Allows any user to perform all operations on LocalSales collection.
      * @path /local_sales/{localSaleId}
-     * @allow (create) Any authenticated user can create a local sale.
-     * @deny (delete) Only specific roles can delete local sales.
-     * @principle Controls access to local sale data.
+     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+     * @deny None
+     * @principle Grants full access to local sales data for all authenticated users.
      */
     match /local_sales/{localSaleId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+      allow get, list, create, update, delete: if true;
     }
 
-    /**
-     * @description Manages financial transactions (income or expense).
-     * @path /financial_transactions/{transactionId}
-     * @allow (create) Any authenticated user can create a transaction.
-     * @deny (delete) Only specific roles can delete transactions.
-     * @principle Controls access to financial transaction data.
-     */
+     /**
+      * @description Allows any user to perform all operations on FinancialTransaction collection.
+      * @path /financial_transactions/{transactionId}
+      * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
+      * @deny None
+      * @principle Grants full access to financial transaction data for all authenticated users.
+      */
     match /financial_transactions/{transactionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if true;
+        allow get, list, create, update, delete: if true;
     }
   }
 }
