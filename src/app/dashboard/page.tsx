@@ -153,9 +153,9 @@ export default function DashboardPage() {
     const currentMonthExports = allExports.filter(e => isWithinInterval(e.date.toDate(), currentMonthInterval));
     
     const currentMonthExportValue = currentMonthExports.reduce((acc, e) => {
-      const product = productsMap.get(e.productId as any);
       const saleValue = e.quantity * e.price;
 
+      const product = productsMap.get(e.productId as any);
       if (product) {
          productSales.set(product.name, (productSales.get(product.name) || 0) + e.quantity);
       }
@@ -167,17 +167,17 @@ export default function DashboardPage() {
       return acc + saleValue;
     }, 0);
     
-    const prevMonthExportValue = allExports.filter(e => isWithinInterval(e.date.toDate(), prevMonthInterval))
-        .reduce((acc, e) => acc + (e.quantity * e.price), 0);
+    const prevMonthPaidExports = allExports.filter(e => isWithinInterval(e.date.toDate(), prevMonthInterval) && e.paymentStatus === 'Paid');
+    const prevMonthExportRevenue = prevMonthPaidExports.reduce((acc, e) => acc + (e.quantity * e.price), 0);
 
      // Process local sales
     const clientLocalSaleValues = new Map<string, {name: string, value: number}>();
     const currentMonthLocalSales = allLocalSales.filter(s => isWithinInterval(s.date.toDate(), currentMonthInterval));
 
     const currentMonthLocalSaleValue = currentMonthLocalSales.reduce((acc, s) => {
-      const product = productsMap.get(s.productId as any);
       const saleValue = s.quantity * s.price;
       
+      const product = productsMap.get(s.productId as any);
       if (product) {
          productSales.set(product.name, (productSales.get(product.name) || 0) + s.quantity);
       }
@@ -189,12 +189,17 @@ export default function DashboardPage() {
       return acc + saleValue;
     }, 0);
 
-    const prevMonthLocalSaleValue = allLocalSales.filter(s => isWithinInterval(s.date.toDate(), prevMonthInterval))
-        .reduce((acc, s) => acc + (s.quantity * s.price), 0);
+    const prevMonthPaidLocalSales = allLocalSales.filter(s => isWithinInterval(s.date.toDate(), prevMonthInterval) && s.paymentStatus === 'Paid');
+    const prevMonthLocalSaleRevenue = prevMonthPaidLocalSales.reduce((acc, s) => acc + (s.quantity * s.price), 0);
         
     // Combine all revenue sources
-    const currentMonthRevenue = currentMonthExportValue + currentMonthLocalSaleValue + currentMonthOtherIncome;
-    const prevMonthRevenue = prevMonthExportValue + prevMonthLocalSaleValue + prevMonthOtherIncome;
+    const currentMonthPaidExports = currentMonthExports.filter(e => e.paymentStatus === 'Paid');
+    const currentMonthPaidLocalSales = currentMonthLocalSales.filter(l => l.paymentStatus === 'Paid');
+    const currentMonthExportRevenue = currentMonthPaidExports.reduce((acc, e) => acc + (e.quantity * e.price), 0);
+    const currentMonthLocalSaleRevenue = currentMonthPaidLocalSales.reduce((acc, s) => acc + (s.quantity * s.price), 0);
+
+    const currentMonthRevenue = currentMonthExportRevenue + currentMonthLocalSaleRevenue + currentMonthOtherIncome;
+    const prevMonthRevenue = prevMonthExportRevenue + prevMonthLocalSaleRevenue + prevMonthOtherIncome;
     
     // Calculate percentage changes
     const revenueChange = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : currentMonthRevenue > 0 ? 100 : 0;
@@ -223,7 +228,7 @@ export default function DashboardPage() {
 
     const monthMap = new Map(monthlyData.map(d => [`${d.month}-${d.year}`, d]));
     
-    const calculateTotalSalesForMonth = (sales: LocalSale[] | Export[], monthKey: string): number => {
+    const calculateTotalSalesForMonth = (sales: (LocalSale[] | Export[]), monthKey: string): number => {
         return sales.filter(s => format(s.date.toDate(), 'MMM-yyyy') === monthKey)
                      .reduce((acc, s) => acc + (s.quantity * s.price), 0);
     };
@@ -241,8 +246,8 @@ export default function DashboardPage() {
     });
 
     monthMap.forEach((data, monthKey) => {
-        data.revenue += calculateTotalSalesForMonth(allExports, monthKey);
-        data.revenue += calculateTotalSalesForMonth(allLocalSales, monthKey);
+        data.revenue += calculateTotalSalesForMonth(allExports.filter(e => e.paymentStatus === 'Paid'), monthKey);
+        data.revenue += calculateTotalSalesForMonth(allLocalSales.filter(s => s.paymentStatus === 'Paid'), monthKey);
     });
     
     return {
