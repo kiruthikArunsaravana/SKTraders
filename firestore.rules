@@ -1,149 +1,260 @@
 /**
- * @fileOverview Firestore Security Rules for HuskTrack.
+ * @fileoverview Firestore Security Rules for HuskTrack application.
  *
  * Core Philosophy:
- * This ruleset enforces role-based access control, allowing authenticated users to manage data based on their assigned roles (Admin, Manager, Employee).
+ * This ruleset enforces a role-based access control model. Users are assigned roles (Admin, Manager, Employee),
+ * and access to data is determined by their role. The `request.auth.uid` claim from Firebase Authentication
+ * is the primary source of truth for user identity.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles.
+ * - /users/{userId}: Stores user profiles, with the user's role denormalized directly into the document.
  * - /clients/{clientId}: Stores client information.
  * - /products/{productId}: Stores product information.
- * - /stocks/{stockId}: Stores stock level for each product.
+ * - /stocks/{stockId}: Stores stock levels.
  * - /sales/{saleId}: Stores sale transactions.
- * - /purchases/{purchaseId}: Stores purchase transactions (raw husk).
- * - /receipts/{receiptId}: Stores receipts for sales and purchases.
+ * - /purchases/{purchaseId}: Stores purchase transactions.
+ * - /receipts/{receiptId}: Stores receipt information.
  * - /expenses/{expenseId}: Stores expense records.
  * - /exports/{exportId}: Stores export order details.
  * - /local_sales/{localSaleId}: Stores local sale order details.
- * - /financial_transactions/{transactionId}: Stores financial transactions (income and expense).
+ * - /financial_transactions/{transactionId}: Stores financial transactions (income/expense).
  *
  * Key Security Decisions:
- * - All collections are accessible to all the users.
- * - Role-based access is enforced on all data collections.
+ * - Role-based access control is enforced for most collections.  Admins have the highest level of access.
+ * - User listing is not explicitly denied but depends on the specific collection.
+ * - Data validation is relaxed in this prototyping phase to allow for rapid iteration, focusing only on
+ *   authorization-critical fields.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to manage their own profile data.
+     * @description Defines if the current user is signed in
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user ID matches the authenticated user's ID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user ID matches the authenticated user's ID and the resource exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    /**
+     * @description Checks if the user has the 'Admin' role.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    /**
+     * @description Checks if the user has the 'Manager' role.
+     */
+    function isManager() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Manager';
+    }
+
+    /**
+     * @description Checks if the user has the 'Employee' role.
+     */
+    function isEmployee() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Employee';
+    }
+
+    /**
+     * @description Rules for user profiles.
      * @path /users/{userId}
-     * @allow (get, list, create, update, delete) - Any user can perform all operations on all documents in users collection.
-     * @deny None
-     * @principle Enforces that any authenticated user can perform all operations.
+     * @allow (create) User with ID 'user123' can create their profile if authenticated as 'user123'.
+     * @allow (get) User with ID 'user123' can read their profile.
+     * @deny (create) User with ID 'user123' cannot create a profile for 'user456'.
+     * @deny (update) User with ID 'user123' cannot update the profile of 'user456'.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows any user to perform all operations on Clients collection.
+     * @description Rules for clients.
      * @path /clients/{clientId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to clients data for all authenticated users.
+     * @allow (create) Admin or Manager can create a client.
+     * @allow (get) Anyone can read a client.
+     * @deny (create) Employee cannot create a client.
+     * @deny (update) Employee cannot update a client.
+     * @principle Restricts client management to Admins and Managers.
      */
     match /clients/{clientId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on Products collection.
+     * @description Rules for products.
      * @path /products/{productId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to products data for all authenticated users.
+     * @allow (create) Admin can create a product.
+     * @allow (get) Anyone can read a product.
+     * @deny (create) Manager cannot create a product.
+     * @deny (update) Employee cannot update a product.
+     * @principle Restricts product management to Admins.
      */
     match /products/{productId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows any user to perform all operations on Stocks collection.
+     * @description Rules for stock levels.
      * @path /stocks/{stockId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to stocks data for all authenticated users.
+     * @allow (create) Admin can create a stock entry.
+     * @allow (get) Anyone can read a stock entry.
+     * @deny (create) Manager cannot create a stock entry.
+     * @deny (update) Employee cannot update a stock entry.
+     * @principle Restricts stock management to Admins.
      */
     match /stocks/{stockId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     /**
-     * @description Allows any user to perform all operations on Sales collection.
+     * @description Rules for sales transactions.
      * @path /sales/{saleId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to sales data for all authenticated users.
+     * @allow (create) Admin or Manager can create a sale.
+     * @allow (get) Anyone can read a sale.
+     * @deny (create) Employee cannot create a sale.
+     * @deny (update) Employee cannot update a sale.
+     * @principle Restricts sale management to Admins and Managers.
      */
     match /sales/{saleId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on Purchases collection.
+     * @description Rules for purchase transactions.
      * @path /purchases/{purchaseId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to purchases data for all authenticated users.
+     * @allow (create) Admin or Manager can create a purchase.
+     * @allow (get) Anyone can read a purchase.
+     * @deny (create) Employee cannot create a purchase.
+     * @deny (update) Employee cannot update a purchase.
+     * @principle Restricts purchase management to Admins and Managers.
      */
     match /purchases/{purchaseId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on Receipts collection.
+     * @description Rules for receipts.
      * @path /receipts/{receiptId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to receipts data for all authenticated users.
+     * @allow (create) Admin or Manager can create a receipt.
+     * @allow (get) Anyone can read a receipt.
+     * @deny (create) Employee cannot create a receipt.
+     * @deny (update) Employee cannot update a receipt.
+     * @principle Restricts receipt management to Admins and Managers.
      */
     match /receipts/{receiptId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on Expenses collection.
+     * @description Rules for expenses.
      * @path /expenses/{expenseId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to expenses data for all authenticated users.
+     * @allow (create) Admin or Manager can create an expense.
+     * @allow (get) Anyone can read an expense.
+     * @deny (create) Employee cannot create an expense.
+     * @deny (update) Employee cannot update an expense.
+     * @principle Restricts expense management to Admins and Managers.
      */
     match /expenses/{expenseId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on Exports collection.
+     * @description Rules for exports.
      * @path /exports/{exportId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to exports data for all authenticated users.
+     * @allow (create) Admin or Manager can create an export.
+     * @allow (get) Anyone can read an export.
+     * @deny (create) Employee cannot create an export.
+     * @deny (update) Employee cannot update an export.
+     * @principle Restricts export management to Admins and Managers.
      */
     match /exports/{exportId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Allows any user to perform all operations on LocalSales collection.
+     * @description Rules for local sales.
      * @path /local_sales/{localSaleId}
-     * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-     * @deny None
-     * @principle Grants full access to local sales data for all authenticated users.
+     * @allow (create) Admin or Manager can create a local sale.
+     * @allow (get) Anyone can read a local sale.
+     * @deny (create) Employee cannot create a local sale.
+     * @deny (update) Employee cannot update a local sale.
+     * @principle Restricts local sale management to Admins and Managers.
      */
     match /local_sales/{localSaleId} {
-      allow get, list, create, update, delete: if true;
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
-     /**
-      * @description Allows any user to perform all operations on FinancialTransaction collection.
-      * @path /financial_transactions/{transactionId}
-      * @allow (get, list, create, update, delete) - Any authenticated user can perform all operations.
-      * @deny None
-      * @principle Grants full access to financial transaction data for all authenticated users.
-      */
+    /**
+     * @description Rules for financial transactions.
+     * @path /financial_transactions/{transactionId}
+     * @allow (create) Admin or Manager can create a financial transaction.
+     * @allow (get) Anyone can read a financial transaction.
+     * @deny (create) Employee cannot create a financial transaction.
+     * @deny (update) Employee cannot update a financial transaction.
+     */
     match /financial_transactions/{transactionId} {
-        allow get, list, create, update, delete: if true;
+        allow get: if true;
+        allow list: if true;
+        allow create: if isAdmin() || isManager();
+        allow update: if isAdmin() || isManager();
+        allow delete: if isAdmin() || isManager();
     }
   }
 }
