@@ -122,8 +122,8 @@ export default function DashboardPage() {
     const currentMonthInterval = { start: currentMonthStart, end: currentMonthEnd };
     const prevMonthInterval = { start: prevMonthStart, end: prevMonthEnd };
 
-    let currentMonthRevenue = 0;
-    let prevMonthRevenue = 0;
+    let currentMonthOtherIncome = 0;
+    let prevMonthOtherIncome = 0;
     let currentMonthExpenses = 0;
     let prevMonthExpenses = 0;
     
@@ -132,9 +132,9 @@ export default function DashboardPage() {
       const transactionDate = t.date.toDate();
       if (t.type === 'income') {
         if (isWithinInterval(transactionDate, currentMonthInterval)) {
-          currentMonthRevenue += t.amount;
+          currentMonthOtherIncome += t.amount;
         } else if (isWithinInterval(transactionDate, prevMonthInterval)) {
-          prevMonthRevenue += t.amount;
+          prevMonthOtherIncome += t.amount;
         }
       } else if (t.type === 'expense') {
         if (isWithinInterval(transactionDate, currentMonthInterval)) {
@@ -144,10 +144,6 @@ export default function DashboardPage() {
         }
       }
     });
-
-    // Calculate percentage changes
-    const revenueChange = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : currentMonthRevenue > 0 ? 100 : 0;
-    const expenseChange = prevMonthExpenses > 0 ? ((currentMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 : currentMonthExpenses > 0 ? 100 : 0;
 
     const productsMap = new Map(products.map(p => [p.id, p]));
     const productSales = new Map<string, number>();
@@ -170,6 +166,9 @@ export default function DashboardPage() {
 
       return acc + saleValue;
     }, 0);
+    
+    const prevMonthExportValue = allExports.filter(e => isWithinInterval(e.date.toDate(), prevMonthInterval))
+        .reduce((acc, e) => acc + (e.quantity * e.price), 0);
 
      // Process local sales
     const clientLocalSaleValues = new Map<string, {name: string, value: number}>();
@@ -189,6 +188,17 @@ export default function DashboardPage() {
       
       return acc + saleValue;
     }, 0);
+
+    const prevMonthLocalSaleValue = allLocalSales.filter(s => isWithinInterval(s.date.toDate(), prevMonthInterval))
+        .reduce((acc, s) => acc + (s.quantity * s.price), 0);
+        
+    // Combine all revenue sources
+    const currentMonthRevenue = currentMonthExportValue + currentMonthLocalSaleValue + currentMonthOtherIncome;
+    const prevMonthRevenue = prevMonthExportValue + prevMonthLocalSaleValue + prevMonthOtherIncome;
+    
+    // Calculate percentage changes
+    const revenueChange = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : currentMonthRevenue > 0 ? 100 : 0;
+    const expenseChange = prevMonthExpenses > 0 ? ((currentMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 : currentMonthExpenses > 0 ? 100 : 0;
 
     // Determine top clients
     const topInternational = [...clientExportValues.values()].sort((a,b) => b.value - a.value)[0];
@@ -212,6 +222,11 @@ export default function DashboardPage() {
     }).reverse();
 
     const monthMap = new Map(monthlyData.map(d => [`${d.month}-${d.year}`, d]));
+    
+    const calculateTotalSalesForMonth = (sales: LocalSale[] | Export[], monthKey: string): number => {
+        return sales.filter(s => format(s.date.toDate(), 'MMM-yyyy') === monthKey)
+                     .reduce((acc, s) => acc + (s.quantity * s.price), 0);
+    };
 
     allTransactions.forEach(t => {
       const monthKey = format(t.date.toDate(), 'MMM-yyyy');
@@ -223,6 +238,11 @@ export default function DashboardPage() {
           entry.expenses += Math.abs(t.amount);
         }
       }
+    });
+
+    monthMap.forEach((data, monthKey) => {
+        data.revenue += calculateTotalSalesForMonth(allExports, monthKey);
+        data.revenue += calculateTotalSalesForMonth(allLocalSales, monthKey);
     });
     
     return {
