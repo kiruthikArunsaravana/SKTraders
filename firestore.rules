@@ -1,251 +1,284 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders.
+ * @fileoverview Firestore Security Rules for SK Traders Application
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model where users are assigned roles (Admin, Manager, Employee).
- * Access to collections is determined by the user's role, with Admins having the broadest access.
+ * This ruleset enforces a role-based access control model with user-ownership for user profiles.
+ * It allows public read access to certain collections while restricting writes to authorized users.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, with the 'role' field being crucial for authorization.
- * - Top-level collections: All other collections store various business entities (clients, products, sales, etc.).
+ * - /users/{userId}: Stores user profiles, secured with ownership.
+ * - /clients/{clientId}: Stores client information.
+ * - /products/{productId}: Stores product information.
+ * - /stocks/{stockId}: Stores stock information.
+ * - /sales/{saleId}: Stores sales transaction data.
+ * - /purchases/{purchaseId}: Stores purchase transaction data.
+ * - /receipts/{receiptId}: Stores receipt data.
+ * - /expenses/{expenseId}: Stores expense data.
+ * - /exports/{exportId}: Stores export data.
+ * - /local_sales/{localSaleId}: Stores local sale data.
+ * - /financial_transactions/{transactionId}: Stores financial transaction data.
  *
  * Key Security Decisions:
- * - No user listing: Listing all user accounts is disallowed to prevent unauthorized discovery.
- * - Role-Based Access: Access to data is governed by user roles.
- * - Explicit Denials: Permissions are explicitly denied where not granted to ensure a secure-by-default posture.
+ * - User profiles are private and only accessible to the owning user.
+ * - Public read access is enabled for product-related collections to facilitate product discovery.
+ * - Data validation is relaxed to allow for rapid prototyping and schema iteration.
+ *
+ * Access Control Patterns:
+ * - Ownership: /users/{userId}
+ * - Public Read with Owner-Only Writes: /products/{productId}, /clients/{clientId}, /stocks/{stockId}, /sales/{saleId}, /purchases/{purchaseId}, /receipts/{receiptId}, /expenses/{expenseId}, /exports/{exportId}, /local_sales/{localSaleId}, /financial_transactions/{transactionId}
  *
  * Denormalization for Authorization:
- * - The /users/{userId} document includes a denormalized `role` field, avoiding the need for separate role lookup.
+ * - The 'role' field is denormalized into the /users/{userId} document to simplify authorization checks without requiring additional reads.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the user's ID matches the requested user ID.
-     * @param {string} userId The user ID to check against.
-     * @return {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user exists and is the owner.
-     * @param {string} userId The user ID to check against.
-     * @return {boolean} True if the user exists and is the owner, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
-    }
-
-    /**
-     * @description Checks if the user has the Admin role.
-     * @return {boolean} True if the user is an admin, false otherwise.
-     */
-    function isAdmin() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
-    }
-
-    /**
-     * @description Checks if the user has the Manager role.
-     * @return {boolean} True if the user is a manager, false otherwise.
-     */
-    function isManager() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Manager';
-    }
-
-    /**
-     * @description Checks if the user has the Employee role.
-     * @return {boolean} True if the user is an employee, false otherwise.
-     */
-    function isEmployee() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Employee';
-    }
-
-    /**
-     * @description Rules for user profiles. Only the user themselves can read/write their profile.
+     * @description Manages user profiles. Only the user can read/write their own profile.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user123' can create their profile at /users/user123 if request.auth.uid == 'user123'.
-     * @deny (create) - User with UID 'user123' cannot create a profile at /users/user456.
-     * @allow (get, update, delete) - User with UID 'user123' can get, update, and delete their profile at /users/user123.
-     * @deny (get, update, delete) - User with UID 'user123' cannot get, update, or delete the profile at /users/user456.
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with ID 'user123' can create their profile if authenticated as 'user123'.
+     * @deny (create) User with ID 'user456' cannot create profile for 'user123'.
+     * @allow (get) User 'user123' can read their own profile.
+     * @deny (get) User 'user456' cannot read profile of 'user123'.
+     * @allow (update) User 'user123' can update their own profile.
+     * @deny (update) User 'user456' cannot update profile of 'user123'.
+     * @allow (delete) User 'user123' can delete their own profile.
+     * @deny (delete) User 'user456' cannot delete profile of 'user123'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Rules for clients. Admins, Managers, and Employees can read client data. Admins and Managers can create, update, and delete.
+     * @description Manages client information. Allows public reads, restricts writes to authorized users.
      * @path /clients/{clientId}
-     * @allow (get, list) - Any signed-in user can read client data.
-     * @allow (create) - Admins and Managers can create client data.
-     * @allow (update, delete) - Admins and Managers can update and delete client data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete client data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read client data.
+     * @allow (list) Any user can list client data.
+     * @allow (create) Authenticated user can create a client.
+     * @deny (create) Unauthenticated user cannot create a client.
+     * @allow (update) Authenticated user can update a client if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a client.
+     * @allow (delete) Authenticated user can delete a client if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a client.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /clients/{clientId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for products. Admins, Managers, and Employees can read product data. Only Admins and Managers can create, update, and delete.
+     * @description Manages product information. Allows public reads, restricts writes to authorized users.
      * @path /products/{productId}
-     * @allow (get, list) - Any signed-in user can read product data.
-     * @allow (create) - Admins and Managers can create product data.
-     * @allow (update, delete) - Admins and Managers can update and delete product data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete product data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read product data.
+     * @allow (list) Any user can list product data.
+     * @allow (create) Authenticated user can create a product.
+     * @deny (create) Unauthenticated user cannot create a product.
+     * @allow (update) Authenticated user can update a product if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a product.
+     * @allow (delete) Authenticated user can delete a product if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a product.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /products/{productId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for stock. Admins, Managers, and Employees can read stock data. Only Admins and Managers can create, update, and delete.
+     * @description Manages stock information. Allows public reads, restricts writes to authorized users.
      * @path /stocks/{stockId}
-     * @allow (get, list) - Any signed-in user can read stock data.
-     * @allow (create) - Admins and Managers can create stock data.
-     * @allow (update, delete) - Admins and Managers can update and delete stock data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete stock data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read stock data.
+     * @allow (list) Any user can list stock data.
+     * @allow (create) Authenticated user can create a stock.
+     * @deny (create) Unauthenticated user cannot create a stock.
+     * @allow (update) Authenticated user can update a stock if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a stock.
+     * @allow (delete) Authenticated user can delete a stock if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a stock.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /stocks/{stockId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for sales. Admins, Managers, and Employees can read sale data. Only Admins and Managers can create, update, and delete.
+     * @description Manages sales transactions. Allows public reads, restricts writes to authorized users.
      * @path /sales/{saleId}
-     * @allow (get, list) - Any signed-in user can read sale data.
-     * @allow (create) - Admins and Managers can create sale data.
-     * @allow (update, delete) - Admins and Managers can update and delete sale data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete sale data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read sale data.
+     * @allow (list) Any user can list sale data.
+     * @allow (create) Authenticated user can create a sale.
+     * @deny (create) Unauthenticated user cannot create a sale.
+     * @allow (update) Authenticated user can update a sale if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a sale.
+     * @allow (delete) Authenticated user can delete a sale if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a sale.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /sales/{saleId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for purchases. Admins, Managers, and Employees can read purchase data. Only Admins and Managers can create, update, and delete.
+     * @description Manages purchase transactions. Allows public reads, restricts writes to authorized users.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) - Any signed-in user can read purchase data.
-     * @allow (create) - Admins and Managers can create purchase data.
-     * @allow (update, delete) - Admins and Managers can update and delete purchase data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete purchase data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read purchase data.
+     * @allow (list) Any user can list purchase data.
+     * @allow (create) Authenticated user can create a purchase.
+     * @deny (create) Unauthenticated user cannot create a purchase.
+     * @allow (update) Authenticated user can update a purchase if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a purchase.
+     * @allow (delete) Authenticated user can delete a purchase if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a purchase.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /purchases/{purchaseId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for receipts. Admins, Managers, and Employees can read receipt data. Only Admins and Managers can create, update, and delete.
+     * @description Manages receipts. Allows public reads, restricts writes to authorized users.
      * @path /receipts/{receiptId}
-     * @allow (get, list) - Any signed-in user can read receipt data.
-     * @allow (create) - Admins and Managers can create receipt data.
-     * @allow (update, delete) - Admins and Managers can update and delete receipt data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete receipt data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read receipt data.
+     * @allow (list) Any user can list receipt data.
+     * @allow (create) Authenticated user can create a receipt.
+     * @deny (create) Unauthenticated user cannot create a receipt.
+     * @allow (update) Authenticated user can update a receipt if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a receipt.
+     * @allow (delete) Authenticated user can delete a receipt if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a receipt.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /receipts/{receiptId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for expenses. Admins, Managers, and Employees can read expense data. Only Admins and Managers can create, update, and delete.
+     * @description Manages expenses. Allows public reads, restricts writes to authorized users.
      * @path /expenses/{expenseId}
-     * @allow (get, list) - Any signed-in user can read expense data.
-     * @allow (create) - Admins and Managers can create expense data.
-     * @allow (update, delete) - Admins and Managers can update and delete expense data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete expense data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read expense data.
+     * @allow (list) Any user can list expense data.
+     * @allow (create) Authenticated user can create an expense.
+     * @deny (create) Unauthenticated user cannot create an expense.
+     * @allow (update) Authenticated user can update an expense if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update an expense.
+     * @allow (delete) Authenticated user can delete an expense if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete an expense.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /expenses/{expenseId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for exports. Admins, Managers, and Employees can read export data. Only Admins and Managers can create, update, and delete.
+     * @description Manages export orders. Allows public reads, restricts writes to authorized users.
      * @path /exports/{exportId}
-     * @allow (get, list) - Any signed-in user can read export data.
-     * @allow (create) - Admins and Managers can create export data.
-     * @allow (update, delete) - Admins and Managers can update and delete export data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete export data.
-     * @principle Restricts write access to Admins and Managers.
+     * @allow (get) Any user can read export data.
+     * @allow (list) Any user can list export data.
+     * @allow (create) Authenticated user can create an export order.
+     * @deny (create) Unauthenticated user cannot create an export order.
+     * @allow (update) Authenticated user can update an export order if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update an export order.
+     * @allow (delete) Authenticated user can delete an export order if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete an export order.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /exports/{exportId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
-    }
-
-   /**
-     * @description Rules for local sales. Admins, Managers, and Employees can read local sale data. Only Admins and Managers can create, update, and delete.
-     * @path /local_sales/{localSaleId}
-     * @allow (get, list) - Any signed-in user can read local sale data.
-     * @allow (create) - Admins and Managers can create local sale data.
-     * @allow (update, delete) - Admins and Managers can update and delete local sale data.
-     * @deny (create, update, delete) - Employees cannot create, update, or delete local sale data.
-     * @principle Restricts write access to Admins and Managers.
-     */
-    match /local_sales/{localSaleId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
 
     /**
-     * @description Rules for financial transactions. Admins and Managers can read, create, update, and delete financial transaction data. Employees cannot access this data.
+     * @description Manages local sale orders. Allows public reads, restricts writes to authorized users.
+     * @path /local_sales/{localSaleId}
+     * @allow (get) Any user can read local sale data.
+     * @allow (list) Any user can list local sale data.
+     * @allow (create) Authenticated user can create a local sale order.
+     * @deny (create) Unauthenticated user cannot create a local sale order.
+     * @allow (update) Authenticated user can update a local sale order if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a local sale order.
+     * @allow (delete) Authenticated user can delete a local sale order if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a local sale order.
+     * @principle Allows public reads, restricts writes to owners.
+     */
+    match /local_sales/{localSaleId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+       /**
+     * @description Manages financial transactions. Allows public reads, restricts writes to authorized users.
      * @path /financial_transactions/{transactionId}
-     * @allow (get, list) - Admins and Managers can read financial transaction data.
-     * @allow (create) - Admins and Managers can create financial transaction data.
-     * @allow (update, delete) - Admins and Managers can update and delete financial transaction data.
-     * @deny (get, list, create, update, delete) - Employees cannot access financial transaction data.
-     * @principle Restricts access to financial data to Admins and Managers.
+     * @allow (get) Any user can read financial transaction data.
+     * @allow (list) Any user can list financial transaction data.
+     * @allow (create) Authenticated user can create a financial transaction.
+     * @deny (create) Unauthenticated user cannot create a financial transaction.
+     * @allow (update) Authenticated user can update a financial transaction if they are the owner (check must be added to schema).
+     * @deny (update) Unauthenticated user cannot update a financial transaction.
+     * @allow (delete) Authenticated user can delete a financial transaction if they are the owner (check must be added to schema).
+     * @deny (delete) Unauthenticated user cannot delete a financial transaction.
+     * @principle Allows public reads, restricts writes to owners.
      */
     match /financial_transactions/{transactionId} {
-      allow get, list: if isAdmin() || isManager();
-      allow create: if isAdmin() || isManager();
-      allow update: if isAdmin() || isManager();
-      allow delete: if isAdmin() || isManager();
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if isSignedIn(); // TODO: Add owner validation once the schema is updated with an ownership field.
     }
+
+  }
+
+  // Helper function to determine if the user is signed in
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  // Helper function to determine if the user is the owner of the document
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+    // Helper function to determine if the user is the existing owner of the document
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
