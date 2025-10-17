@@ -1,271 +1,259 @@
 /**
- * @fileoverview Firestore Security Rules for HuskTrack application.
+ * @fileoverview Firestore Security Rules for SK Traders.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model, granting specific
- * permissions based on the user's role (Admin, Manager, Employee). The system
- * emphasizes authorization independence through denormalization. Data validation
- * is relaxed for rapid prototyping.
+ * This ruleset enforces a role-based access control model. Users can read all data,
+ * but writes are restricted based on their role (Admin, Manager, Employee) and document ownership.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles. User documents are secured using
- *   owner-only access.
- * - /clients/{clientId}: Stores client information. Access is restricted to
- *   authorized users.
- * - /products/{productId}: Stores product information. Access is restricted to
- *   authorized users.
- * - /stocks/{stockId}: Stores stock information. Access is restricted to
- *   authorized users.
- * - /sales/{saleId}: Stores sale transaction. Access is restricted to
- *   authorized users.
- * - /purchases/{purchaseId}: Stores purchase transaction. Access is
- *   restricted to authorized users.
- * - /receipts/{receiptId}: Stores receipt data. Access is restricted to
- *   authorized users.
- * - /expenses/{expenseId}: Stores expense data. Access is restricted to
- *   authorized users.
- * - /exports/{exportId}: Stores export data. Access is restricted to
- *   authorized users.
- * - /local_sales/{localSaleId}: Stores local sale data. Access is restricted
- *   to authorized users.
- * - /financial_transactions/{transactionId}: Stores financial transaction data.
- *   Access is restricted to authorized users.
+ * - /users/{userId}: Stores user profile information, including roles.
+ * - /clients/{clientId}: Stores client data.
+ * - /products/{productId}: Stores product information.
+ * - /stocks/{stockId}: Stores stock levels.
+ * - /sales/{saleId}: Stores sale transactions.
+ * - /purchases/{purchaseId}: Stores purchase transactions.
+ * - /receipts/{receiptId}: Stores receipts related to sales and purchases.
+ * - /expenses/{expenseId}: Stores expense records.
+ * - /exports/{exportId}: Stores export order details.
+ * - /local_sales/{localSaleId}: Stores local sale order details.
+ * - /financial_transactions/{transactionId}: Stores financial transactions (income and expenses).
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - Data validation is minimized for faster prototyping. Authorization is
- *   prioritized.
- * - The ruleset defaults to strict owner-only access where relationships are
- *   ambiguous.
+ * - All data is readable by any authenticated user for reporting purposes, in order to provide visibility to all staff.
+ * - User listing is not allowed.
+ * - All write operations are only permitted for authenticated users with the role of admin, manager, or employee
+ * - The rules are designed to be flexible on data shapes for prototyping purposes.
  *
  * Denormalization for Authorization:
- * - User roles are denormalized into the /users/{userId} document to simplify
- *   role checks.
- *
- * Structural Segregation:
- * - User-specific data is segregated under /users/{userId} to simplify
- *   ownership checks.
+ * - The user's role is denormalized into the /users/{userId} document to allow for efficient role-based access control.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profiles, ensuring users can only access their own data.
-     * @path /users/{userId}
-     * @allow (create) User with ID 'user123' can create their profile.
-     * @deny (create) User with ID 'user456' cannot create a profile for 'user123'.
-     * @allow (get, update, delete) Authenticated user 'user123' can get, update, or delete their profile.
-     * @deny (get, update, delete) Authenticated user 'user456' cannot get, update, or delete 'user123' profile.
-     * @principle Enforces document ownership for writes.
+     * @description Checks if the user is signed in.
      */
-    match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
+    /**
+     * @description Checks if the user's ID matches the requested user ID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is an existing owner (signed in, owns the document, and the document exists).
+     */
+    function isExistingOwner(userId) {
+        return isSignedIn() && isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    /**
+     * @description Allows any signed in user to read.
+     */
+    function canRead() {
+        return isSignedIn();
+    }
+
+    /**
+     * @description Checks if the user has the 'admin', 'manager', or 'employee' role.
+     * @return {bool} True if user is admin, manager, or employee. False otherwise.
+     */
+    function isAdminManagerOrEmployee() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager', 'employee'];
+    }
+
+   /**
+    * @description
+    *   Allows authenticated users to read their own user document.
+    *   Allows the user to create their own document, validating that the `id` matches their `uid`.
+    *   Does not allow updating or deleting a user document after creation.
+    * @path /users/{userId}
+    * @allow (get, list) User with matching UID
+    * @allow (create) User with matching UID
+    * @deny (update, delete) Any user
+    * @principle Enforces document ownership and prevents unauthorized modifications.
+    */
+    match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages client data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read client documents.
+     * Allows admin, manager, or employee to create, update, or delete client documents.
      * @path /clients/{clientId}
-     * @allow (create) Authorized user can create a client document.
-     * @deny (create) Unauthorized user cannot create a client document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete client documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete client documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /clients/{clientId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages product data, accessible to authorized users (e.g., Admins).
+     * @description Allows any signed-in user to read product documents.
+     * Allows admin, manager, or employee to create, update, or delete product documents.
      * @path /products/{productId}
-     * @allow (create) Authorized user can create a product document.
-     * @deny (create) Unauthorized user cannot create a product document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete product documents.
-     * @deny (get, list, update, or delete) Unauthorized user cannot get, list, update, or delete product documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /products/{productId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages stock data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read stock documents.
+     * Allows admin, manager, or employee to create, update, or delete stock documents.
      * @path /stocks/{stockId}
-     * @allow (create) Authorized user can create a stock document.
-     * @deny (create) Unauthorized user cannot create a stock document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete stock documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete stock documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /stocks/{stockId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages sale data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read sale documents.
+     * Allows admin, manager, or employee to create, update, or delete sale documents.
      * @path /sales/{saleId}
-     * @allow (create) Authorized user can create a sale document.
-     * @deny (create) Unauthorized user cannot create a sale document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete sale documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete sale documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /sales/{saleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages purchase data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read purchase documents.
+     * Allows admin, manager, or employee to create, update, or delete purchase documents.
      * @path /purchases/{purchaseId}
-     * @allow (create) Authorized user can create a purchase document.
-     * @deny (create) Unauthorized user cannot create a purchase document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete purchase documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete purchase documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /purchases/{purchaseId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages receipt data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read receipt documents.
+     * Allows admin, manager, or employee to create, update, or delete receipt documents.
      * @path /receipts/{receiptId}
-     * @allow (create) Authorized user can create a receipt document.
-     * @deny (create) Unauthorized user cannot create a receipt document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete receipt documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete receipt documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /receipts/{receiptId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages expense data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read expense documents.
+     * Allows admin, manager, or employee to create, update, or delete expense documents.
      * @path /expenses/{expenseId}
-     * @allow (create) Authorized user can create an expense document.
-     * @deny (create) Unauthorized user cannot create an expense document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete expense documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete expense documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /expenses/{expenseId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages export data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read export documents.
+     * Allows admin, manager, or employee to create, update, or delete export documents.
      * @path /exports/{exportId}
-     * @allow (create) Authorized user can create an export document.
-     * @deny (create) Unauthorized user cannot create an export document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete export documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete export documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /exports/{exportId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages local sale data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read local_sales documents.
+     * Allows admin, manager, or employee to create, update, or delete local_sales documents.
      * @path /local_sales/{localSaleId}
-     * @allow (create) Authorized user can create a local sale document.
-     * @deny (create) Unauthorized user cannot create a local sale document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete local sale documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete local sale documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /local_sales/{localSaleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
 
     /**
-     * @description Manages financial transaction data, accessible to authorized users (e.g., Managers, Admins).
+     * @description Allows any signed-in user to read financial_transactions documents.
+     * Allows admin, manager, or employee to create, update, or delete financial_transactions documents.
      * @path /financial_transactions/{transactionId}
-     * @allow (create) Authorized user can create a financial transaction document.
-     * @deny (create) Unauthorized user cannot create a financial transaction document.
-     * @allow (get, list, update, delete) Authorized user can get, list, update, or delete financial transaction documents.
-     * @deny (get, list, update, delete) Unauthorized user cannot get, list, update, or delete financial transaction documents.
-     * @principle Restricts data access to authorized users.
+     * @allow (get, list) Any signed-in user
+     * @allow (create, update, delete) Admin, Manager, or Employee role
+     * @deny (create, update, delete) Other users
+     * @principle Restricts write access based on user role.
      */
     match /financial_transactions/{transactionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // In a real application, roles would be validated here.  For prototyping, any signed-in user can access.
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if canRead();
+      allow list: if canRead();
+      allow create: if isAdminManagerOrEmployee();
+      allow update: if isAdminManagerOrEmployee();
+      allow delete: if isAdminManagerOrEmployee();
     }
   }
 }
