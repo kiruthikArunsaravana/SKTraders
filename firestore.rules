@@ -1,11 +1,257 @@
-
+/**
+ * @fileoverview Firestore Security Rules for SK Traders.
+ *
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for personal data and uses role-based access control for shared resources and administrative functions.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores individual user profiles, accessible only to the authenticated user.
+ * - /clients/{clientId}, /products/{productId}, /stock/{stockId}, /sales/{saleId}, /purchases/{purchaseId}, /receipts/{receiptId}, /expenses/{expenseId}, /exports/{exportId}: Stores global data accessible to authorized users.
+ * - /users/{userId}/financial_transactions/{transactionId}: Stores financial transactions specific to each user, accessible only by that user.
+ * - /roles_admin/{userId}, /roles_manager/{userId}, /roles_employee/{userId}: Collections used to manage user roles. The presence of a document for a user indicates they have that role.
+ *
+ * Key Security Decisions:
+ * - User listing is disallowed to protect user privacy.
+ * - Role assignment is managed through dedicated collections.
+ * - Data types and schema are not validated in this prototyping phase, except where necessary for relational integrity.
+ * - Write operations are strictly controlled based on user roles.
+ *
+ * Denormalization for Authorization:
+ * - User roles are stored in separate collections (`/roles_admin`, `/roles_manager`, `/roles_employee`) to allow direct existence checks in security rules, avoiding costly `get()` calls to user documents.
+ * - Financial transactions are nested under users to avoid `get()` calls and enforce user-specific access.
+ *
+ * Structural Segregation:
+ * - User-specific financial transactions are stored in a private subcollection (`/users/{userId}/financial_transactions`) to ensure only the owning user can access them, while other collections are top-level for simplicity.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    /**
+     * @description Checks if the request is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is an existing owner (isOwner and the resource exists).
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    /**
+     * @description Checks if the user has the 'admin' role.
+     */
+    function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Checks if the user has the 'manager' role.
+     */
+    function isManager() {
+        return exists(/databases/$(database)/documents/roles_manager/$(request.auth.uid));
+    }
+
+     /**
+     * @description Checks if the user has the 'employee' role.
+     */
+    function isEmployee() {
+        return exists(/databases/$(database)/documents/roles_employee/$(request.auth.uid));
+    }
+
+    /**
+     * @description Rule for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (create) User with UID 'user123' creates their profile.
+     * @deny (create) User with UID 'user123' tries to create a profile for 'user456'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+     /**
+      * @description Rules for the /clients/{clientId} collection.
+      * @path /clients/{clientId}
+      * @allow (create) Admin or Manager creates a client profile.
+      * @deny (create) Regular user attempts to create a client profile.
+      * @principle Restricts client creation to admins and managers.
+      */
+    match /clients/{clientId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /products/{productId} collection.
+     * @path /products/{productId}
+     * @allow (create) Admin or Manager creates a product.
+     * @deny (create) Regular user attempts to create a product.
+     * @principle Restricts product creation to admins and managers.
+     */
+    match /products/{productId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /stock/{stockId} collection.
+     * @path /stock/{stockId}
+     * @allow (create) Admin or Manager creates a stock entry.
+     * @deny (create) Regular user attempts to create a stock entry.
+     * @principle Restricts stock creation to admins and managers.
+     */
+    match /stock/{stockId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /sales/{saleId} collection.
+     * @path /sales/{saleId}
+     * @allow (create) Admin or Manager creates a sale transaction.
+     * @deny (create) Regular user attempts to create a sale transaction.
+     * @principle Restricts sale creation to admins and managers.
+     */
+    match /sales/{saleId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /purchases/{purchaseId} collection.
+     * @path /purchases/{purchaseId}
+     * @allow (create) Admin or Manager creates a purchase transaction.
+     * @deny (create) Regular user attempts to create a purchase transaction.
+     * @principle Restricts purchase creation to admins and managers.
+     */
+    match /purchases/{purchaseId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /receipts/{receiptId} collection.
+     * @path /receipts/{receiptId}
+     * @allow (create) Admin or Manager creates a receipt.
+     * @deny (create) Regular user attempts to create a receipt.
+     * @principle Restricts receipt creation to admins and managers.
+     */
+    match /receipts/{receiptId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /expenses/{expenseId} collection.
+     * @path /expenses/{expenseId}
+     * @allow (create) Admin or Manager creates an expense entry.
+     * @deny (create) Regular user attempts to create an expense entry.
+     * @principle Restricts expense creation to admins and managers.
+     */
+    match /expenses/{expenseId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rules for the /exports/{exportId} collection.
+     * @path /exports/{exportId}
+     * @allow (create) Admin or Manager creates an export order.
+     * @deny (create) Regular user attempts to create an export order.
+     * @principle Restricts export creation to admins and managers.
+     */
+    match /exports/{exportId} {
+      allow get: if isAdmin() || isManager() || isEmployee();
+      allow list: if isAdmin() || isManager() || isEmployee();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
+    }
+
+    /**
+     * @description Rule for the /users/{userId}/financial_transactions/{transactionId} collection.
+     * @path /users/{userId}/financial_transactions/{transactionId}
+     * @allow (create) User with UID 'user123' creates their financial transaction.
+     * @deny (create) User with UID 'user123' tries to create a financial transaction for 'user456'.
+     * @principle Enforces document ownership for writes.
+     */
+    match /users/{userId}/financial_transactions/{transactionId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+     /**
+      * @description Rules for the /roles_admin/{userId} collection.
+      * @path /roles_admin/{userId}
+      */
+    match /roles_admin/{userId} {
+      allow get: if isAdmin() || isManager(); // Only admins/managers can check roles
+      allow list: if false; // No listing of admin roles
+      allow create: if isAdmin(); // Only admins can assign admin role
+      allow update: if false; // No updates allowed
+      allow delete: if isAdmin(); // Only admins can revoke admin role
+    }
+
+    /**
+     * @description Rules for the /roles_manager/{userId} collection.
+     * @path /roles_manager/{userId}
+     */
+    match /roles_manager/{userId} {
+      allow get: if isAdmin() || isManager(); // Only admins/managers can check roles
+      allow list: if false; // No listing of manager roles
+      allow create: if isAdmin(); // Only admins can assign manager role
+      allow update: if false; // No updates allowed
+      allow delete: if isAdmin(); // Only admins can revoke manager role
+    }
+
+    /**
+     * @description Rules for the /roles_employee/{userId} collection.
+     * @path /roles_employee/{userId}
+     */
+    match /roles_employee/{userId} {
+      allow get: if isAdmin() || isManager(); // Only admins/managers can check roles
+      allow list: if false; // No listing of employee roles
+      allow create: if isAdmin() || isManager(); // Only admins/managers can assign employee role
+      allow update: if false; // No updates allowed
+      allow delete: if isAdmin() || isManager(); // Only admins/managers can revoke employee role
     }
   }
 }
-
-    
