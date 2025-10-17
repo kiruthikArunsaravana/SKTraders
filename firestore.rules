@@ -2,270 +2,250 @@
  * @fileoverview Firestore Security Rules for SK Traders.
  *
  * Core Philosophy:
- * This ruleset enforces role-based access control, with specific permissions granted to 'Admin', 'Manager', and 'Employee' roles.
- * User documents are self-owned for creation, and admins can manage all data. Other collections are generally accessible only to admins, or sometimes managers, depending on the entity.
+ * This ruleset enforces a role-based access control model where users are assigned roles (Admin, Manager, Employee).
+ * Access to collections is determined by the user's role, with Admins having the broadest access.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, with roles.
- * - /clients/{clientId}: Stores client information.
- * - /products/{productId}: Stores product information.
- * - /stocks/{stockId}: Stores stock levels.
- * - /sales/{saleId}: Stores sales transactions.
- * - /purchases/{purchaseId}: Stores purchase transactions.
- * - /receipts/{receiptId}: Stores receipts.
- * - /expenses/{expenseId}: Stores expenses.
- * - /exports/{exportId}: Stores export orders.
- * - /local_sales/{localSaleId}: Stores local sale orders.
- * - /financial_transactions/{transactionId}: Stores financial transactions.
+ * - /users/{userId}: Stores user profiles, with the 'role' field being crucial for authorization.
+ * - Top-level collections: All other collections store various business entities (clients, products, sales, etc.).
  *
  * Key Security Decisions:
- * - Only authenticated users can access any data.
- * - User listing is disallowed for privacy.
- * - Each collection is secured based on role, as defined below.
+ * - No user listing: Listing all user accounts is disallowed to prevent unauthorized discovery.
+ * - Role-Based Access: Access to data is governed by user roles.
+ * - Explicit Denials: Permissions are explicitly denied where not granted to ensure a secure-by-default posture.
+ *
+ * Denormalization for Authorization:
+ * - The /users/{userId} document includes a denormalized `role` field, avoiding the need for separate role lookup.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /**
+     * @description Checks if the user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Manages user profiles. Only the user themselves can create their profile. Admins can read and write all user data.
+     * @description Checks if the user's ID matches the requested user ID.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user exists and is the owner.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the user exists and is the owner, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    /**
+     * @description Checks if the user has the Admin role.
+     * @return {boolean} True if the user is an admin, false otherwise.
+     */
+    function isAdmin() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    /**
+     * @description Checks if the user has the Manager role.
+     * @return {boolean} True if the user is a manager, false otherwise.
+     */
+    function isManager() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Manager';
+    }
+
+    /**
+     * @description Checks if the user has the Employee role.
+     * @return {boolean} True if the user is an employee, false otherwise.
+     */
+    function isEmployee() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Employee';
+    }
+
+    /**
+     * @description Rules for user profiles. Only the user themselves can read/write their profile.
      * @path /users/{userId}
-     * @allow (create) - User with ID 'user123' creates their own profile.
-     *   request.auth.uid == 'user123' && request.resource.data.id == 'user123'
-     * @allow (get, update, delete) - Admin user 'admin456' can get, update, and delete any user profile.
-     *   request.auth.uid == 'admin456' and hasRole('Admin')
-     * @deny (create) - User 'user456' tries to create a profile for 'user789'.
-     *   request.auth.uid == 'user456' && request.resource.data.id == 'user789'
-     * @principle Enforces document ownership for creation and role-based access for other operations.
+     * @allow (create) - User with UID 'user123' can create their profile at /users/user123 if request.auth.uid == 'user123'.
+     * @deny (create) - User with UID 'user123' cannot create a profile at /users/user456.
+     * @allow (get, update, delete) - User with UID 'user123' can get, update, and delete their profile at /users/user123.
+     * @deny (get, update, delete) - User with UID 'user123' cannot get, update, or delete the profile at /users/user456.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (isOwner(userId) || hasRole('Admin'));
-      allow list: if false; // User listing is not permitted.
-      allow create: if isSignedIn() && isOwner(userId) && request.auth.uid == userId;
-      allow update: if isSignedIn() && (isOwner(userId) || hasRole('Admin'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Manages client information. Accessible only to Admins and Managers.
+     * @description Rules for clients. Admins, Managers, and Employees can read client data. Admins and Managers can create, update, and delete.
      * @path /clients/{clientId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all client data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access client data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts client data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read client data.
+     * @allow (create) - Admins and Managers can create client data.
+     * @allow (update, delete) - Admins and Managers can update and delete client data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete client data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /clients/{clientId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages product information. Accessible only to Admins and Managers.
+     * @description Rules for products. Admins, Managers, and Employees can read product data. Only Admins and Managers can create, update, and delete.
      * @path /products/{productId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all product data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access product data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts product data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read product data.
+     * @allow (create) - Admins and Managers can create product data.
+     * @allow (update, delete) - Admins and Managers can update and delete product data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete product data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /products/{productId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages stock information. Accessible only to Admins and Managers.
+     * @description Rules for stock. Admins, Managers, and Employees can read stock data. Only Admins and Managers can create, update, and delete.
      * @path /stocks/{stockId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all stock data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access stock data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts stock data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read stock data.
+     * @allow (create) - Admins and Managers can create stock data.
+     * @allow (update, delete) - Admins and Managers can update and delete stock data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete stock data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /stocks/{stockId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages sales transactions. Accessible only to Admins and Managers.
+     * @description Rules for sales. Admins, Managers, and Employees can read sale data. Only Admins and Managers can create, update, and delete.
      * @path /sales/{saleId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all sale data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access sale data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts sale data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read sale data.
+     * @allow (create) - Admins and Managers can create sale data.
+     * @allow (update, delete) - Admins and Managers can update and delete sale data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete sale data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /sales/{saleId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages purchase transactions. Accessible only to Admins and Managers.
+     * @description Rules for purchases. Admins, Managers, and Employees can read purchase data. Only Admins and Managers can create, update, and delete.
      * @path /purchases/{purchaseId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all purchase data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access purchase data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts purchase data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read purchase data.
+     * @allow (create) - Admins and Managers can create purchase data.
+     * @allow (update, delete) - Admins and Managers can update and delete purchase data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete purchase data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /purchases/{purchaseId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages receipts. Accessible only to Admins and Managers.
+     * @description Rules for receipts. Admins, Managers, and Employees can read receipt data. Only Admins and Managers can create, update, and delete.
      * @path /receipts/{receiptId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all receipt data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access receipt data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts receipt data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read receipt data.
+     * @allow (create) - Admins and Managers can create receipt data.
+     * @allow (update, delete) - Admins and Managers can update and delete receipt data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete receipt data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /receipts/{receiptId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages expenses. Accessible only to Admins and Managers.
+     * @description Rules for expenses. Admins, Managers, and Employees can read expense data. Only Admins and Managers can create, update, and delete.
      * @path /expenses/{expenseId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all expense data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access expense data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts expense data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read expense data.
+     * @allow (create) - Admins and Managers can create expense data.
+     * @allow (update, delete) - Admins and Managers can update and delete expense data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete expense data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /expenses/{expenseId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
     /**
-     * @description Manages export orders. Accessible only to Admins and Managers.
+     * @description Rules for exports. Admins, Managers, and Employees can read export data. Only Admins and Managers can create, update, and delete.
      * @path /exports/{exportId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all export data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access export data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts export data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read export data.
+     * @allow (create) - Admins and Managers can create export data.
+     * @allow (update, delete) - Admins and Managers can update and delete export data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete export data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /exports/{exportId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
 
-    /**
-     * @description Manages local sale orders. Accessible only to Admins and Managers.
+   /**
+     * @description Rules for local sales. Admins, Managers, and Employees can read local sale data. Only Admins and Managers can create, update, and delete.
      * @path /local_sales/{localSaleId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all local sale data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access local sale data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts local sale data management to authorized roles.
+     * @allow (get, list) - Any signed-in user can read local sale data.
+     * @allow (create) - Admins and Managers can create local sale data.
+     * @allow (update, delete) - Admins and Managers can update and delete local sale data.
+     * @deny (create, update, delete) - Employees cannot create, update, or delete local sale data.
+     * @principle Restricts write access to Admins and Managers.
      */
     match /local_sales/{localSaleId} {
-      function hasRole(role) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-      }
-
-      allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-      allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
+
     /**
-     * @description Manages financial transactions. Accessible only to Admins and Managers.
+     * @description Rules for financial transactions. Admins and Managers can read, create, update, and delete financial transaction data. Employees cannot access this data.
      * @path /financial_transactions/{transactionId}
-     * @allow (create, get, list, update, delete) - Admin user 'admin456' can manage all financial transaction data.
-     *   request.auth.uid == 'admin456' && hasRole('Admin')
-     * @deny (create, get, list, update, delete) - Employee user 'employee789' cannot access financial transaction data.
-     *   request.auth.uid == 'employee789' && hasRole('Employee')
-     * @principle Restricts financial transaction data management to authorized roles.
+     * @allow (get, list) - Admins and Managers can read financial transaction data.
+     * @allow (create) - Admins and Managers can create financial transaction data.
+     * @allow (update, delete) - Admins and Managers can update and delete financial transaction data.
+     * @deny (get, list, create, update, delete) - Employees cannot access financial transaction data.
+     * @principle Restricts access to financial data to Admins and Managers.
      */
     match /financial_transactions/{transactionId} {
-        function hasRole(role) {
-            return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
-        }
-
-
-        allow get: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-        allow list: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-        allow create: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-        allow update: if isSignedIn() && (hasRole('Admin') || hasRole('Manager'));
-        allow delete: if isSignedIn() && hasRole('Admin');
+      allow get, list: if isAdmin() || isManager();
+      allow create: if isAdmin() || isManager();
+      allow update: if isAdmin() || isManager();
+      allow delete: if isAdmin() || isManager();
     }
   }
 }
