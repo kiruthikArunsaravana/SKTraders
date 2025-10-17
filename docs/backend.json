@@ -477,182 +477,49 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles. Includes denormalized 'role' for authorization independence.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/clients/{clientId}",
-        "definition": {
-          "entityName": "Client",
-          "schema": {
-            "$ref": "#/backend/entities/Client"
-          },
-          "description": "Stores client information.",
-          "params": [
-            {
-              "name": "clientId",
-              "description": "The unique identifier for the client."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": {
-            "$ref": "#/backend/entities/Product"
-          },
-          "description": "Stores product information (Coco Pith, Coir Fiber, Coconut Husk Chips).",
-          "params": [
-            {
-              "name": "productId",
-              "description": "The unique identifier for the product."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/stocks/{stockId}",
-        "definition": {
-          "entityName": "Stock",
-          "schema": {
-            "$ref": "#/backend/entities/Stock"
-          },
-          "description": "Stores stock level for each product.",
-          "params": [
-            {
-              "name": "stockId",
-              "description": "The unique identifier for the stock."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/sales/{saleId}",
-        "definition": {
-          "entityName": "Sale",
-          "schema": {
-            "$ref": "#/backend/entities/Sale"
-          },
-          "description": "Stores sale transactions.",
-          "params": [
-            {
-              "name": "saleId",
-              "description": "The unique identifier for the sale."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/purchases/{purchaseId}",
-        "definition": {
-          "entityName": "Purchase",
-          "schema": {
-            "$ref": "#/backend/entities/Purchase"
-          },
-          "description": "Stores purchase transactions (raw husk).",
-          "params": [
-            {
-              "name": "purchaseId",
-              "description": "The unique identifier for the purchase."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/receipts/{receiptId}",
-        "definition": {
-          "entityName": "Receipt",
-          "schema": {
-            "$ref": "#/backend/entities/Receipt"
-          },
-          "description": "Stores receipts for sales and purchases.",
-          "params": [
-            {
-              "name": "receiptId",
-              "description": "The unique identifier for the receipt."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/expenses/{expenseId}",
-        "definition": {
-          "entityName": "Expense",
-          "schema": {
-            "$ref": "#/backend/entities/Expense"
-          },
-          "description": "Stores expense records.",
-          "params": [
-            {
-              "name": "expenseId",
-              "description": "The unique identifier for the expense."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/exports/{exportId}",
-        "definition": {
-          "entityName": "Export",
-          "schema": {
-            "$ref": "#/backend/entities/Export"
-          },
-          "description": "Stores export order details.",
-          "params": [
-            {
-              "name": "exportId",
-              "description": "The unique identifier for the export."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/local_sales/{localSaleId}",
-        "definition": {
-          "entityName": "LocalSale",
-          "schema": {
-            "$ref": "#/backend/entities/LocalSale"
-          },
-          "description": "Stores local sale order details.",
-          "params": [
-            {
-              "name": "localSaleId",
-              "description": "The unique identifier for the local sale."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/financial_transactions/{transactionId}",
-        "definition": {
-          "entityName": "FinancialTransaction",
-          "schema": { "$ref": "#/backend/entities/FinancialTransaction" },
-          "description": "Stores all income and expense transactions.",
-          "params": [
-            {
-              "name": "transactionId",
-              "description": "The unique identifier for the financial transaction."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to reflect the core entities of the HuskTrack system and enforce robust security rules. Key design decisions prioritize authorization independence through denormalization and structural segregation for simplified rules and scalable security.  \n\n1.  **Authorization Independence (Denormalization):**\n    *   User roles are stored directly in the `/users/{userId}` document. This avoids the need for `get()` calls to determine a user's role during other operations. All other entities that require role based access depend on the uid which is provided by `request.auth.uid` and its comparison with roles present in each entity.\n\n2.  **Structural Segregation:**\n    *   The structure segregates data based on ownership and access requirements. User-specific data resides under `/users/{userId}`, while global data like `/products` is stored at the root level.\n    *   This segregation simplifies security rules by ensuring that all documents within a collection share the same security posture. For example, only admins can modify product data, while users can only modify their own user documents.\n\n3.  **Access Modeling:**\n    *   **User-Owned Data:** The `/users/{userId}` collection follows the Path-Based Ownership model, granting users full control over their own data.\n    *   **Global Data:** The `/products`, `/clients` collections are accessible to users with appropriate roles (e.g., Admin for products, Manager/Admin for clients).\n\n4. **QAPs (Rules are not Filters):**\n    * Role based access to product, sale, purchase, receipt, expense and export data enables secure `list` operations, as read operations are constrained to authorized users via `request.auth.uid` and its comparison with roles present in each entity."
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles. Includes denormalized 'role' for authorization independence."
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Stores client information."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Stores product information (Coco Pith, Coir Fiber, Coconut Husk Chips)."
+    },
+    "/stocks/{stockId}": {
+      "schema": { "$ref": "#/entities/Stock" },
+      "description": "Stores stock level for each product."
+    },
+    "/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Stores sale transactions."
+    },
+    "/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/Purchase" },
+      "description": "Stores purchase transactions (raw husk)."
+    },
+    "/receipts/{receiptId}": {
+      "schema": { "$ref": "#/entities/Receipt" },
+      "description": "Stores receipts for sales and purchases."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Stores expense records."
+    },
+    "/exports/{exportId}": {
+      "schema": { "$ref": "#/entities/Export" },
+      "description": "Stores export order details."
+    },
+    "/local_sales/{localSaleId}": {
+      "schema": { "$ref": "#/entities/LocalSale" },
+      "description": "Stores local sale order details."
+    },
+    "/financial_transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/FinancialTransaction" },
+      "description": "Stores all income and expense transactions."
+    }
   }
 }
