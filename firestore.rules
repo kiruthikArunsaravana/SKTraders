@@ -1,259 +1,174 @@
 /**
- * @fileoverview Firestore Security Rules for SK Traders.
+ * @file Firestore Security Rules
+ * @description This ruleset allows anyone to see the data.
  *
  * Core Philosophy:
- * This ruleset enforces a role-based access control model. Users can read all data,
- * but writes are restricted based on their role (Admin, Manager, Employee) and document ownership.
+ * The ruleset grants public read access to all collections, enabling any user (authenticated or unauthenticated) to retrieve data.
+ * All write operations are denied.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information, including roles.
- * - /clients/{clientId}: Stores client data.
- * - /products/{productId}: Stores product information.
- * - /stocks/{stockId}: Stores stock levels.
- * - /sales/{saleId}: Stores sale transactions.
- * - /purchases/{purchaseId}: Stores purchase transactions.
- * - /receipts/{receiptId}: Stores receipts related to sales and purchases.
- * - /expenses/{expenseId}: Stores expense records.
- * - /exports/{exportId}: Stores export order details.
- * - /local_sales/{localSaleId}: Stores local sale order details.
- * - /financial_transactions/{transactionId}: Stores financial transactions (income and expenses).
+ * The Firestore database is structured with top-level collections for each entity: users, clients, products, stocks, sales, purchases, receipts, expenses, exports, local_sales, and financial_transactions.
  *
  * Key Security Decisions:
- * - All data is readable by any authenticated user for reporting purposes, in order to provide visibility to all staff.
- * - User listing is not allowed.
- * - All write operations are only permitted for authenticated users with the role of admin, manager, or employee
- * - The rules are designed to be flexible on data shapes for prototyping purposes.
- *
- * Denormalization for Authorization:
- * - The user's role is denormalized into the /users/{userId} document to allow for efficient role-based access control.
+ * - Public Read Access: All `get` and `list` operations are allowed for all users, including unauthenticated users.
+ * - No Write Access: All `create`, `update`, and `delete` operations are denied, preventing unauthorized data modification.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
+     * @description Allows anyone to read user data, but restricts all write operations.
+     * @path /users/{userId}
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify user data.
+     * @principle Allows public read access to user data.
      */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the user's ID matches the requested user ID.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is an existing owner (signed in, owns the document, and the document exists).
-     */
-    function isExistingOwner(userId) {
-        return isSignedIn() && isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
-    }
-
-    /**
-     * @description Allows any signed in user to read.
-     */
-    function canRead() {
-        return isSignedIn();
-    }
-
-    /**
-     * @description Checks if the user has the 'admin', 'manager', or 'employee' role.
-     * @return {bool} True if user is admin, manager, or employee. False otherwise.
-     */
-    function isAdminManagerOrEmployee() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'manager', 'employee'];
-    }
-
-   /**
-    * @description
-    *   Allows authenticated users to read their own user document.
-    *   Allows the user to create their own document, validating that the `id` matches their `uid`.
-    *   Does not allow updating or deleting a user document after creation.
-    * @path /users/{userId}
-    * @allow (get, list) User with matching UID
-    * @allow (create) User with matching UID
-    * @deny (update, delete) Any user
-    * @principle Enforces document ownership and prevents unauthorized modifications.
-    */
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow get, list: if true;
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read client documents.
-     * Allows admin, manager, or employee to create, update, or delete client documents.
+     * @description Allows anyone to read client data, but restricts all write operations.
      * @path /clients/{clientId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify client data.
+     * @principle Allows public read access to client data.
      */
     match /clients/{clientId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read product documents.
-     * Allows admin, manager, or employee to create, update, or delete product documents.
+     * @description Allows anyone to read product data, but restricts all write operations.
      * @path /products/{productId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify product data.
+     * @principle Allows public read access to product data.
      */
     match /products/{productId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read stock documents.
-     * Allows admin, manager, or employee to create, update, or delete stock documents.
+     * @description Allows anyone to read stock data, but restricts all write operations.
      * @path /stocks/{stockId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify stock data.
+     * @principle Allows public read access to stock data.
      */
     match /stocks/{stockId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read sale documents.
-     * Allows admin, manager, or employee to create, update, or delete sale documents.
+     * @description Allows anyone to read sales data, but restricts all write operations.
      * @path /sales/{saleId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify sales data.
+     * @principle Allows public read access to sales data.
      */
     match /sales/{saleId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read purchase documents.
-     * Allows admin, manager, or employee to create, update, or delete purchase documents.
+     * @description Allows anyone to read purchase data, but restricts all write operations.
      * @path /purchases/{purchaseId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify purchase data.
+     * @principle Allows public read access to purchase data.
      */
     match /purchases/{purchaseId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read receipt documents.
-     * Allows admin, manager, or employee to create, update, or delete receipt documents.
+     * @description Allows anyone to read receipt data, but restricts all write operations.
      * @path /receipts/{receiptId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify receipt data.
+     * @principle Allows public read access to receipt data.
      */
     match /receipts/{receiptId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read expense documents.
-     * Allows admin, manager, or employee to create, update, or delete expense documents.
+     * @description Allows anyone to read expense data, but restricts all write operations.
      * @path /expenses/{expenseId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify expense data.
+     * @principle Allows public read access to expense data.
      */
     match /expenses/{expenseId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read export documents.
-     * Allows admin, manager, or employee to create, update, or delete export documents.
+     * @description Allows anyone to read export data, but restricts all write operations.
      * @path /exports/{exportId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify export data.
+     * @principle Allows public read access to export data.
      */
     match /exports/{exportId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read local_sales documents.
-     * Allows admin, manager, or employee to create, update, or delete local_sales documents.
+     * @description Allows anyone to read local_sales data, but restricts all write operations.
      * @path /local_sales/{localSaleId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify local_sales data.
+     * @principle Allows public read access to local_sales data.
      */
     match /local_sales/{localSaleId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Allows any signed-in user to read financial_transactions documents.
-     * Allows admin, manager, or employee to create, update, or delete financial_transactions documents.
+     * @description Allows anyone to read financial_transactions data, but restricts all write operations.
      * @path /financial_transactions/{transactionId}
-     * @allow (get, list) Any signed-in user
-     * @allow (create, update, delete) Admin, Manager, or Employee role
-     * @deny (create, update, delete) Other users
-     * @principle Restricts write access based on user role.
+     * @allow (get, list) - Any user can read the data.
+     * @deny (create, update, delete) - No one can modify financial_transactions data.
+     * @principle Allows public read access to financial_transactions data.
      */
     match /financial_transactions/{transactionId} {
-      allow get: if canRead();
-      allow list: if canRead();
-      allow create: if isAdminManagerOrEmployee();
-      allow update: if isAdminManagerOrEmployee();
-      allow delete: if isAdminManagerOrEmployee();
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
