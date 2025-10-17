@@ -20,6 +20,82 @@
         "id",
         "email"
       ]
+    },
+    "Client": {
+      "title": "Client",
+      "type": "object",
+      "description": "Represents a client of SK Traders.",
+      "properties": {
+        "contactName": { "type": "string" },
+        "companyName": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "totalSales": { "type": "number" },
+        "lastPurchaseDate": { "type": "string", "format": "date-time" },
+        "country": { "type": "string" },
+        "clientType": { "type": "string", "enum": ["local", "international"] }
+      },
+      "required": ["companyName", "contactName", "contactEmail", "clientType", "country"]
+    },
+    "Product": {
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in stock.",
+      "properties": {
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" }
+      },
+      "required": ["name", "quantity", "costPrice", "sellingPrice"]
+    },
+    "FinancialTransaction": {
+      "title": "Financial Transaction",
+      "type": "object",
+      "description": "Represents an income or expense transaction.",
+      "properties": {
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" }
+      },
+      "required": ["type", "amount", "description", "date", "category"]
+    },
+    "Export": {
+      "title": "Export",
+      "type": "object",
+      "description": "Represents an export order.",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "productId": { "type": "string" },
+        "destinationCountry": { "type": "string" },
+        "destinationPort": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["To-do", "In Progress", "Completed"] },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] },
+        "invoiceNumber": { "type": "string" }
+      },
+      "required": ["clientId", "clientName", "productId", "quantity", "price", "date", "status", "paymentStatus", "invoiceNumber"]
+    },
+    "LocalSale": {
+      "title": "Local Sale",
+      "type": "object",
+      "description": "Represents a local sale order.",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "productId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["To-do", "In Progress", "Completed"] },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] },
+        "invoiceNumber": { "type": "string" }
+      },
+      "required": ["clientId", "clientName", "productId", "quantity", "price", "date", "status", "paymentStatus", "invoiceNumber"]
     }
   },
   "auth": {
@@ -29,23 +105,29 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles. The `userId` parameter is the Firebase Auth UID.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Auth UID of the user."
-            }
-          ]
-        }
-      }
-    ]
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Stores client information."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Stores product stock information."
+    },
+    "/financial_transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/FinancialTransaction" },
+      "description": "Stores all financial transactions (income and expenses)."
+    },
+    "/exports/{exportId}": {
+      "schema": { "$ref": "#/entities/Export" },
+      "description": "Stores export order details."
+    },
+    "/local_sales/{saleId}": {
+      "schema": { "$ref": "#/entities/LocalSale" },
+      "description": "Stores local sale order details."
+    }
   }
 }
