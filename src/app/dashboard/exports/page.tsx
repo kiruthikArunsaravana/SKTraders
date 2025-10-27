@@ -251,7 +251,7 @@ export default function ExportsPage() {
     
     doc.setFont('Playfair Display', 'bold');
     doc.setFontSize(22);
-    doc.text('HuskTrack Export Report', 14, 22);
+    doc.text('SKTraders Export Report', 14, 22);
     doc.setFont('PT Sans', 'normal');
     doc.setFontSize(12);
     doc.text(`For SK Traders`, 14, 30);
@@ -289,7 +289,7 @@ export default function ExportsPage() {
     doc.setFontSize(14);
     doc.text(`Total Export Value: $${totalValue.toLocaleString()}`, 14, finalY);
 
-    doc.save(`HuskTrack-Export-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    doc.save(`SKTraders-Export-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
     toast({
         title: "PDF Generated",

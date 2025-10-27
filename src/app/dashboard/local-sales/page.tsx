@@ -233,7 +233,7 @@ export default function LocalSalesPage() {
     
     doc.setFont('Playfair Display', 'bold');
     doc.setFontSize(22);
-    doc.text('HuskTrack Local Sales Report', 14, 22);
+    doc.text('SKTraders Local Sales Report', 14, 22);
     doc.setFont('PT Sans', 'normal');
     doc.setFontSize(12);
     doc.text(`For SK Traders`, 14, 30);
@@ -270,7 +270,7 @@ export default function LocalSalesPage() {
     doc.setFontSize(14);
     doc.text(`Total Sale Value: $${totalValue.toLocaleString()}`, 14, finalY);
 
-    doc.save(`HuskTrack-Local-Sales-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    doc.save(`SKTraders-Local-Sales-Report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
     toast({
         title: "PDF Generated",

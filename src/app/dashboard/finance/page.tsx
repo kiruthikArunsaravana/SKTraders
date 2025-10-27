@@ -304,7 +304,7 @@ export default function FinancePage() {
     doc.setFontSize(10);
     doc.text(`--- End of Report ---`, 14, finalY + 10);
 
-    doc.save(`HuskTrack-Finance-Comparison-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    doc.save(`SKTraders-Finance-Comparison-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     toast({
       title: "PDF Report Generated",
       description: "Your report has been successfully downloaded.",
