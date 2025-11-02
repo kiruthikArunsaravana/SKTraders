@@ -5,8 +5,8 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'SKTraders - Management',
-  description: 'Coconut husk processing and export management system for SK Traders.',
+  title: 'SKTraders Tracker - Management',
+  description: 'Coconut husk processing and export management system for SKTraders. Track clients, stock, sales, and finances with SKTraders Tracker.',
 };
 
 export default function RootLayout({
