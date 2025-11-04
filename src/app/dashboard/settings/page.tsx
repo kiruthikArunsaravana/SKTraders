@@ -145,7 +145,8 @@ export default function SettingsPage() {
                 <DialogHeader>
                   <DialogTitle>Authentication Required</DialogTitle>
                   <DialogDescription>
-                    To proceed, please enter the administrator password.
+                    To proceed, please enter the administrator password. The
+                    password is SK-Traders.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
@@ -171,6 +172,7 @@ export default function SettingsPage() {
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete all transactional data from the database.
+                    
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
