@@ -85,10 +85,12 @@ export default function SettingsPage() {
         });
       }
       
-      // Reset product quantities
+      // Reset product quantities using set with merge to avoid "no document to update" error
       for (const product of initialProducts) {
         const productRef = doc(firestore, 'products', product.id);
-        batch.update(productRef, { quantity: 0 });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { icon, ...dbProductData } = product;
+        batch.set(productRef, { ...dbProductData, quantity: 0 }, { merge: true });
       }
 
       await batch.commit();
@@ -153,7 +155,7 @@ export default function SettingsPage() {
                   <Label htmlFor="password">Password</Label>
                   <Input 
                     id="password" 
-                    type="password" 
+                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
@@ -172,7 +174,6 @@ export default function SettingsPage() {
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete all transactional data from the database.
-                    
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -183,7 +184,6 @@ export default function SettingsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
           </div>
         </CardContent>
       </Card>
