@@ -129,6 +129,7 @@ export default function SettingsPage() {
               <h3 className="font-semibold">Reset Application Data</h3>
               <p className="text-sm text-muted-foreground">
                 This will permanently delete all clients, sales, exports, and financial records. Product stock will be reset to zero.
+                The Pass word is "SK-Traders"
               </p>
             </div>
             
