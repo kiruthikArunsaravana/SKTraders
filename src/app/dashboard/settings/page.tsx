@@ -46,7 +46,8 @@ export default function SettingsPage() {
 
   const collectionsToClear = ['clients', 'exports', 'local_sales', 'financial_transactions'];
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (password === 'SK-Traders') {
       setPasswordDialogOpen(false);
       setConfirmDialogOpen(true);
@@ -90,7 +91,7 @@ export default function SettingsPage() {
         const productRef = doc(firestore, 'products', product.id);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { icon, ...dbProductData } = product;
-        batch.set(productRef, { ...dbProductData, quantity: 0 }, { merge: true });
+        batch.set(productRef, { ...dbProductData }, { merge: true });
       }
 
       await batch.commit();
@@ -152,20 +153,21 @@ export default function SettingsPage() {
                     password is SK-Traders.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handlePasswordSubmit}>Proceed</Button>
-                </DialogFooter>
+                <form onSubmit={handlePasswordSubmit}>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input 
+                      id="password" 
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                  <DialogFooter className="mt-4">
+                    <Button variant="outline" type="button" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit">Proceed</Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
 
