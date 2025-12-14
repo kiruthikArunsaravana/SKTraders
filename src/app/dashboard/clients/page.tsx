@@ -12,8 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Client } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, addDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,25 +49,32 @@ export default function ClientsPage() {
        return;
     }
 
-    const clientsCollection = collection(firestore, 'clients');
-    const newClientData = {
-      contactName,
-      contactEmail,
-      companyName,
-      country,
-      clientType,
-      totalSales: 0,
-      lastPurchaseDate: Timestamp.now(),
-    };
-    
-    addDocumentNonBlocking(clientsCollection, newClientData);
+    try {
+      const clientsCollection = collection(firestore, 'clients');
+      await addDoc(clientsCollection, {
+        contactName,
+        contactEmail,
+        companyName,
+        country,
+        clientType,
+        totalSales: 0,
+        lastPurchaseDate: Timestamp.now(),
+      });
 
-    setDialogOpen(false);
-    (event.target as HTMLFormElement).reset();
-    toast({
-      title: "Client Added",
-      description: `${companyName} has been successfully added.`,
-    });
+      setDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      toast({
+        title: "Client Added",
+        description: `${companyName} has been successfully added.`,
+      });
+    } catch (error: any) {
+      console.error("Error adding client: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Adding Client',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    }
   }
 
   return (

@@ -19,8 +19,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { LocalSale, SaleStatus, Client, Product, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, where, runTransaction, addDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { initialProducts } from '@/lib/data';
@@ -135,28 +134,35 @@ export default function LocalSalesPage() {
       return;
     }
 
-    const salesCollection = collection(firestore, 'local_sales');
-    const newSaleData = {
-      clientId: client.id,
-      clientName: client.companyName,
-      quantity,
-      price,
-      date: Timestamp.now(),
-      status,
-      paymentStatus,
-      invoiceNumber,
-      productId,
-    };
-    
-    addDocumentNonBlocking(salesCollection, newSaleData);
-
-    setAddDialogOpen(false);
-    (event.target as HTMLFormElement).reset();
-    setSelectedClientId('');
-    toast({
-      title: "Local Sale Added",
-      description: `Sale for ${newSaleData.clientName} has been successfully added.`,
-    });
+    try {
+      const salesCollection = collection(firestore, 'local_sales');
+      await addDoc(salesCollection, {
+        clientId: client.id,
+        clientName: client.companyName,
+        quantity,
+        price,
+        date: Timestamp.now(),
+        status,
+        paymentStatus,
+        invoiceNumber,
+        productId,
+      });
+      
+      setAddDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      setSelectedClientId('');
+      toast({
+        title: "Local Sale Added",
+        description: `Sale for ${client.companyName} has been successfully added.`,
+      });
+    } catch (error: any) {
+      console.error("Error adding local sale: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Adding Sale',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    }
   }
 
   const handleEditStatus = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -222,11 +228,20 @@ export default function LocalSalesPage() {
         return;
       }
     } else {
-       updateDocumentNonBlocking(saleRef, updatePayload);
-       toast({
-          title: "Sale Updated",
-          description: `Sale has been updated.`,
-      });
+       try {
+        await updateDoc(saleRef, updatePayload);
+        toast({
+            title: "Sale Updated",
+            description: `Sale has been updated.`,
+        });
+       } catch (error: any) {
+        console.error("Error updating sale: ", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error Updating Sale',
+          description: error.message || 'An unexpected error occurred.',
+        });
+       }
     }
 
     setEditDialogOpen(false);

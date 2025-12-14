@@ -58,8 +58,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp, where } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, where, addDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const expenseCategories = [
@@ -222,25 +221,34 @@ export default function FinancePage() {
       return;
     }
 
-    const transactionsCollection = collection(firestore, 'financial_transactions');
-    const newTransaction: FinancialTransaction = {
-      id: '', // Firestore will generate
-      type,
-      amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
-      description,
-      category,
-      date: Timestamp.fromDate(date),
-      ...(type === 'expense' && { clientName, quantity }),
-    };
+    try {
+      const transactionsCollection = collection(firestore, 'financial_transactions');
+      const newTransaction: Omit<FinancialTransaction, 'id'> = {
+        type,
+        amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+        description,
+        category,
+        date: Timestamp.fromDate(date),
+        ...(clientName && { clientName }),
+        ...(quantity && { quantity }),
+      };
 
-    addDocumentNonBlocking(transactionsCollection, newTransaction);
-    
-    setAddEntryDialogOpen(false);
-    (event.target as HTMLFormElement).reset();
-    toast({
-      title: 'Transaction Added',
-      description: `A new ${type} of $${Math.abs(amount)} has been recorded.`,
-    });
+      await addDoc(transactionsCollection, newTransaction);
+      
+      setAddEntryDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      toast({
+        title: 'Transaction Added',
+        description: `A new ${type} of $${Math.abs(amount)} has been recorded.`,
+      });
+    } catch (error: any) {
+      console.error("Error adding transaction:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Adding Transaction',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    }
   }
   
   const handleGeneratePdf = () => {

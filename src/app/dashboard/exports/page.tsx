@@ -19,8 +19,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { Export, ExportStatus, Client, Product, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp, doc, where, runTransaction } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, where, runTransaction, addDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { initialProducts } from '@/lib/data';
@@ -148,31 +147,38 @@ export default function ExportsPage() {
       return;
     }
 
-    const exportsCollection = collection(firestore, 'exports');
-    const newExportData = {
-      clientId: client.id,
-      clientName: client.companyName,
-      destinationCountry: country,
-      destinationPort,
-      quantity,
-      price,
-      date: Timestamp.now(),
-      status,
-      paymentStatus,
-      invoiceNumber,
-      productId,
-    };
-    
-    addDocumentNonBlocking(exportsCollection, newExportData);
+    try {
+      const exportsCollection = collection(firestore, 'exports');
+      await addDoc(exportsCollection, {
+        clientId: client.id,
+        clientName: client.companyName,
+        destinationCountry: country,
+        destinationPort,
+        quantity,
+        price,
+        date: Timestamp.now(),
+        status,
+        paymentStatus,
+        invoiceNumber,
+        productId,
+      });
 
-    setAddDialogOpen(false);
-    (event.target as HTMLFormElement).reset();
-    setSelectedClientId('');
-    setDestinationCountry('');
-    toast({
-      title: "Export Order Added",
-      description: `Order for ${newExportData.clientName} has been successfully added.`,
-    });
+      setAddDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      setSelectedClientId('');
+      setDestinationCountry('');
+      toast({
+        title: "Export Order Added",
+        description: `Order for ${client.companyName} has been successfully added.`,
+      });
+    } catch (error: any) {
+      console.error("Error adding export order: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Adding Export Order',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    }
   }
 
   const handleEditStatus = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -226,11 +232,20 @@ export default function ExportsPage() {
         return;
       }
     } else {
-       updateDocumentNonBlocking(exportRef, updatePayload);
-       toast({
-          title: "Order Updated",
-          description: `Order has been updated.`,
-      });
+       try {
+        await updateDoc(exportRef, updatePayload);
+        toast({
+            title: "Order Updated",
+            description: `Order has been updated.`,
+        });
+       } catch (error: any) {
+        console.error("Error updating order: ", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error Updating Order',
+          description: error.message || 'An unexpected error occurred.',
+        });
+       }
     }
 
     setEditDialogOpen(false);
