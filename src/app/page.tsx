@@ -4,18 +4,20 @@ import { useState, FormEvent, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { useAuth, useUser } from '@/firebase/provider';
+import { useAuth, useUser, useFirestore } from '@/firebase/provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { placeholderImages } from '@/lib/placeholder-images.json';
 import { Loader2 } from 'lucide-react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const [email, setEmail] = useState('manager@gmail.com');
   const [password, setPassword] = useState('SecureP@ss123');
@@ -31,7 +33,7 @@ export default function LoginPage() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!auth) {
+    if (!auth || !firestore) {
       toast({
         variant: "destructive",
         title: "Authentication service not ready.",
@@ -48,6 +50,7 @@ export default function LoginPage() {
           title: 'Login Successful',
           description: 'Redirecting you to the dashboard...',
         });
+        // No need to setIsSigningIn(false) here as the page will redirect
       })
       .catch((signInError: any) => {
         if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
@@ -60,12 +63,33 @@ export default function LoginPage() {
               setIsSigningIn(false);
               return;
           }
+          // Create user and then create their profile document
           createUserWithEmailAndPassword(auth, email, password)
-            .then(() => {
-              toast({
-                title: 'Account Created & Logged In',
-                description: 'Welcome! Redirecting you to the dashboard...',
+            .then((userCredential) => {
+              const newUser = userCredential.user;
+              const userRef = doc(firestore, 'users', newUser.uid);
+              
+              // Define the role based on email, default to 'Employee'
+              let role = 'Employee';
+              if (email.toLowerCase().includes('manager')) {
+                role = 'Manager';
+              } else if (email.toLowerCase().includes('admin')) {
+                role = 'Admin';
+              }
+
+              // Set the user document in Firestore
+              return setDoc(userRef, {
+                id: newUser.uid,
+                email: newUser.email,
+                role: role,
+                createdAt: serverTimestamp()
               });
+            })
+            .then(() => {
+                toast({
+                  title: 'Account Created & Logged In',
+                  description: 'Welcome! Redirecting you to the dashboard...',
+                });
             })
             .catch((signUpError: any) => {
               toast({
