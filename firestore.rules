@@ -16,11 +16,12 @@
  * - /financial_transactions/{transactionId}: Stores financial transaction data. Public read, owner-only write access.
  * - /exports/{exportId}: Stores export order data. Public read, owner-only write access.
  * - /local_sales/{saleId}: Stores local sale data. Public read, owner-only write access.
+ * - /coconut_purchases/{purchaseId}: Stores coconut purchase records. Public read, owner-only write access.
  *
  * Key Security Decisions:
  * - User listing is disabled to prevent data harvesting.
  * - Public read access is enabled for the 'clients', 'products', 'financial_transactions',
- *   'exports', and 'local_sales' collections to support open data display. However, write
+ *   'exports', 'local_sales' and 'coconut_purchases' collections to support open data display. However, write
  *   access is strictly controlled to prevent unauthorized modifications.
  * - To simplify rules and improve performance, data required for authorization (e.g.,
  *   ownership) should be denormalized directly onto the documents being secured.
@@ -142,7 +143,19 @@ service cloud.firestore {
 
       allow read, write: if isSignedIn();
     }
+    
+    /**
+     * @description Allows public read access to coconut purchase data, but restricts write access to authenticated users.
+     * @path /coconut_purchases/{purchaseId}
+     * @allow (read, write) - Any authenticated user can read and write coconut purchase data.
+     * @principle Public read access with owner-only writes.
+     */
+    match /coconut_purchases/{purchaseId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow read, write: if isSignedIn();
+    }
   }
 }
-
-    
