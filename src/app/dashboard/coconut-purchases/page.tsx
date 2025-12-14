@@ -104,6 +104,7 @@ export default function CoconutPurchasesPage() {
         if (!productDoc.exists()) {
           newQuantity = quantity;
           transaction.set(productRef, {
+            id: 'coconut',
             name: "Coconut",
             quantity: newQuantity,
             costPrice: 10,
