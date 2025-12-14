@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, Calendar as CalendarIcon, Edit } from 'lucide-react';
+import { PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -26,8 +26,6 @@ const paymentStatuses: PaymentStatus[] = ['Pending', 'Paid'];
 export default function CoconutPurchasesPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<CoconutPurchase | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | 'all'>('all');
 
@@ -64,10 +62,6 @@ export default function CoconutPurchasesPage() {
       return isInDateRange && hasPaymentStatus;
     });
   }, [purchases, dateRange, paymentStatusFilter]);
-
-  const totalValue = useMemo(() => {
-    return filteredPurchases.reduce((acc, p) => acc + (p.quantity * p.price), 0);
-  }, [filteredPurchases]);
 
   async function handleAddPurchase(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,7 +103,8 @@ export default function CoconutPurchasesPage() {
         }
 
         // Add purchase record
-        transaction.set(doc(collection(firestore, 'coconut_purchases')), {
+        const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
+        transaction.set(purchaseRef, {
             clientId: client.id,
             clientName: client.companyName,
             quantity,
@@ -132,8 +127,15 @@ export default function CoconutPurchasesPage() {
           });
         }
       
-        // Create or update product stock
-        transaction.set(productRef, { quantity: newQuantity, modifiedDate: purchaseDate, name: "Coconut", costPrice: 10, sellingPrice: 15 }, { merge: true });
+        // Create or update product stock. Use set with merge to create if not exists.
+        transaction.set(productRef, { 
+            id: 'coconut',
+            name: "Coconut", 
+            quantity: newQuantity, 
+            costPrice: 10, // Assuming a default, adjust if needed
+            sellingPrice: 15, // Assuming a default, adjust if needed
+            modifiedDate: purchaseDate 
+        }, { merge: true });
       });
       
       setAddDialogOpen(false);
@@ -153,41 +155,31 @@ export default function CoconutPurchasesPage() {
     }
   }
 
-  const handleEditStatus = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!firestore || !selectedPurchase) {
+  const handleStatusChange = async (purchase: CoconutPurchase, newPaymentStatus: PaymentStatus) => {
+    if (!firestore) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update status.' });
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-    const newPaymentStatus = formData.get('paymentStatus') as PaymentStatus;
-
-    if (!newPaymentStatus) {
-      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please select a payment status.' });
-      return;
-    }
-    
-    if (newPaymentStatus === selectedPurchase.paymentStatus) {
-      setEditDialogOpen(false);
-      return;
+    if (newPaymentStatus === purchase.paymentStatus) {
+      return; // No change
     }
 
-    const purchaseRef = doc(firestore, 'coconut_purchases', selectedPurchase.id);
+    const purchaseRef = doc(firestore, 'coconut_purchases', purchase.id);
 
     try {
       await updateDoc(purchaseRef, { paymentStatus: newPaymentStatus });
 
       if (newPaymentStatus === 'Paid') {
-        const totalAmount = selectedPurchase.quantity * selectedPurchase.price;
+        const totalAmount = purchase.quantity * purchase.price;
         await addDoc(collection(firestore, 'financial_transactions'), {
           type: 'expense',
           amount: -totalAmount,
-          description: `Paid for purchase of ${selectedPurchase.quantity} coconuts from ${selectedPurchase.clientName}`,
+          description: `Paid for purchase of ${purchase.quantity} coconuts from ${purchase.clientName}`,
           category: 'Coconut',
           date: Timestamp.now(), // Use current date for payment
-          clientName: selectedPurchase.clientName,
-          quantity: selectedPurchase.quantity,
+          clientName: purchase.clientName,
+          quantity: purchase.quantity,
         });
 
         toast({
@@ -200,10 +192,6 @@ export default function CoconutPurchasesPage() {
           description: `Purchase status has been updated to ${newPaymentStatus}.`,
         });
       }
-
-      setEditDialogOpen(false);
-      setSelectedPurchase(null);
-
     } catch (error: any) {
       console.error("Failed to update payment status:", error);
       toast({
@@ -271,7 +259,7 @@ export default function CoconutPurchasesPage() {
               <DialogHeader>
                 <DialogTitle>Add New Coconut Purchase</DialogTitle>
                 <DialogDescription>
-                  Enter the details of the new purchase. This will increase stock. If marked as 'Paid', an expense is also created.
+                  Enter the details of the new purchase. Stock will be increased. If status is 'Paid', an expense is also created.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddPurchase}>
@@ -326,16 +314,15 @@ export default function CoconutPurchasesPage() {
                 <TableHead>Client</TableHead>
                 <TableHead className="hidden sm:table-cell">Quantity</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
-                <TableHead className="hidden md:table-cell">Payment</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead className="text-right">Total Value</TableHead>
-                 <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
                   <>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   </>
               )}
               {!isLoading && filteredPurchases.length > 0 ? (
@@ -346,21 +333,32 @@ export default function CoconutPurchasesPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{p.quantity.toLocaleString()} pcs</TableCell>
                     <TableCell className="hidden md:table-cell">{format(p.date.toDate(), 'PP')}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant={statusBadgeVariant(p.paymentStatus)}>{p.paymentStatus}</Badge>
+                    <TableCell>
+                      {p.paymentStatus === 'Paid' ? (
+                          <Badge variant={statusBadgeVariant(p.paymentStatus)}>{p.paymentStatus}</Badge>
+                      ) : (
+                        <Select defaultValue={p.paymentStatus} onValueChange={(value: PaymentStatus) => handleStatusChange(p, value)}>
+                            <SelectTrigger className="w-[110px] h-8">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {paymentStatuses.map(status => (
+                                    <SelectItem key={status} value={status}>
+                                        <Badge variant={statusBadgeVariant(status)} className="w-full text-center">
+                                            {status}
+                                        </Badge>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">${(p.quantity * p.price).toLocaleString()}</TableCell>
-                     <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" onClick={() => { setSelectedPurchase(p); setEditDialogOpen(true); }}>
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit Payment Status</span>
-                        </Button>
-                    </TableCell>
                   </TableRow>
                 ))
               ) : !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
                     No purchases match your filters.
                   </TableCell>
                 </TableRow>
@@ -369,39 +367,9 @@ export default function CoconutPurchasesPage() {
           </Table>
         </CardContent>
       </Card>
-      
-      {/* Edit Payment Status Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Payment Status</DialogTitle>
-            <DialogDescription>
-              Update the payment status for the purchase from {selectedPurchase?.clientName}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEditStatus}>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-payment-status">Payment Status</Label>
-                <Select name="paymentStatus" defaultValue={selectedPurchase?.paymentStatus} required>
-                  <SelectTrigger id="edit-payment-status">
-                    <SelectValue placeholder="Select payment status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentStatuses.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit">Update Status</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+    
+
     
