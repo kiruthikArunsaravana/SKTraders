@@ -17,8 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, query, orderBy, Timestamp, doc, runTransaction, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -106,15 +105,14 @@ export default function CoconutPurchasesPage() {
     const totalAmount = quantity * price;
 
     try {
-        const batch = writeBatch(firestore);
-
+       await runTransaction(firestore, async (transaction) => {
         // 1. Add purchase document
         const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
-        batch.set(purchaseRef, newPurchaseData);
+        transaction.set(purchaseRef, newPurchaseData);
 
         // 2. Add financial transaction for the expense
         const transactionRef = doc(collection(firestore, 'financial_transactions'));
-        batch.set(transactionRef, {
+        transaction.set(transactionRef, {
             type: 'expense',
             amount: -totalAmount,
             description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
@@ -126,31 +124,35 @@ export default function CoconutPurchasesPage() {
 
         // 3. Update coconut stock
         const productRef = doc(firestore, 'products', 'coconut');
-        const productDoc = await runTransaction(firestore, async (transaction) => {
-            const doc = await transaction.get(productRef);
-            if (!doc.exists()) {
-                transaction.set(productRef, { quantity: quantity, name: "Coconut", costPrice: 10, sellingPrice: 15, modifiedDate: purchaseDate });
-                return;
-            }
-            const currentQuantity = doc.data().quantity || 0;
+        const productDoc = await transaction.get(productRef);
+        
+        if (!productDoc.exists()) {
+            transaction.set(productRef, { 
+              name: "Coconut", 
+              quantity: quantity, 
+              costPrice: 10, 
+              sellingPrice: 15, 
+              modifiedDate: purchaseDate 
+            });
+        } else {
+            const currentQuantity = productDoc.data().quantity || 0;
             transaction.update(productRef, { quantity: currentQuantity + quantity, modifiedDate: purchaseDate });
-        });
+        }
+      });
 
-        await batch.commit();
-
-        setAddDialogOpen(false);
-        (event.target as HTMLFormElement).reset();
-        toast({
-          title: "Coconut Purchase Added",
-          description: `Purchase from ${client.companyName} recorded, expense created, and stock updated.`,
-        });
+      setAddDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      toast({
+        title: "Coconut Purchase Added",
+        description: `Purchase from ${client.companyName} recorded, expense created, and stock updated.`,
+      });
 
     } catch (error: any) {
         console.error("Failed to add coconut purchase:", error);
         toast({
             variant: 'destructive',
             title: 'Operation Failed',
-            description: 'Could not save the purchase and update stock. Please try again.'
+            description: error.message || 'Could not save the purchase and update stock. Please try again.'
         });
     }
   }
