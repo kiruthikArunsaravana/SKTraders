@@ -1,4 +1,3 @@
-
 'use client';
 
 import { PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
@@ -298,4 +297,5 @@ export default function CoconutPurchasesPage() {
       </Card>
     </div>
   );
-  
+}
+    
