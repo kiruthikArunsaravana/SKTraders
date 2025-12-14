@@ -4,115 +4,298 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user in the system.",
+      "description": "Represents a user of the HuskTrack system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user entity."
+          "description": "Unique identifier for the User entity."
         },
         "email": {
           "type": "string",
-          "description": "Email address of the user.",
+          "description": "User's email address.",
           "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user (Admin, Manager, Employee)."
         }
       },
       "required": [
         "id",
-        "email"
+        "email",
+        "role"
       ]
     },
     "Client": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Client",
       "type": "object",
       "description": "Represents a client of SK Traders.",
       "properties": {
-        "contactName": { "type": "string" },
-        "companyName": { "type": "string" },
-        "contactEmail": { "type": "string", "format": "email" },
-        "totalSales": { "type": "number" },
-        "lastPurchaseDate": { "type": "string", "format": "date-time" },
-        "country": { "type": "string" },
-        "clientType": { "type": "string", "enum": ["local", "international"] }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Client entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Client's name."
+        },
+        "contactInfo": {
+          "type": "string",
+          "description": "Client's contact information."
+        },
+        "exportPreferences": {
+          "type": "string",
+          "description": "Client's export preferences."
+        }
       },
-      "required": ["companyName", "contactName", "contactEmail", "clientType", "country"]
+      "required": [
+        "id",
+        "name",
+        "contactInfo"
+      ]
     },
     "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product in stock.",
+      "description": "Represents a product (Coco Pith, Coir Fiber, Coconut Husk Chips).",
       "properties": {
-        "name": { "type": "string" },
-        "quantity": { "type": "number" },
-        "costPrice": { "type": "number" },
-        "sellingPrice": { "type": "number" },
-        "modifiedDate": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Product name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Product description."
+        }
       },
-      "required": ["name", "quantity", "costPrice", "sellingPrice"]
+      "required": [
+        "id",
+        "name"
+      ]
     },
-    "FinancialTransaction": {
-      "title": "Financial Transaction",
+    "Stock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Stock",
       "type": "object",
-      "description": "Represents an income or expense transaction.",
+      "description": "Represents the stock level of a product.",
       "properties": {
-        "type": { "type": "string", "enum": ["income", "expense"] },
-        "amount": { "type": "number" },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "category": { "type": "string" },
-        "clientName": { "type": "string" },
-        "quantity": { "type": "number" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Stock entity."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Stock)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product in stock."
+        },
+        "costPrice": {
+          "type": "number",
+          "description": "Cost price of the product."
+        },
+        "sellingPrice": {
+          "type": "number",
+          "description": "Selling price of the product."
+        }
       },
-      "required": ["type", "amount", "description", "date", "category"]
+      "required": [
+        "id",
+        "productId",
+        "quantity",
+        "costPrice",
+        "sellingPrice"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sale transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Sale entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to Client. (Relationship: Client 1:N Sale)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Sale)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of product sold."
+        },
+        "saleDate": {
+          "type": "string",
+          "description": "Date of the sale.",
+          "format": "date-time"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount of the sale."
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "productId",
+        "quantity",
+        "saleDate",
+        "totalAmount"
+      ]
+    },
+    "Purchase": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Purchase",
+      "type": "object",
+      "description": "Represents a purchase transaction of raw husk.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Purchase entity."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Purchase)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of husk purchased."
+        },
+        "purchaseDate": {
+          "type": "string",
+          "description": "Date of the purchase.",
+          "format": "date-time"
+        },
+        "cost": {
+          "type": "number",
+          "description": "Cost of the purchase."
+        }
+      },
+      "required": [
+        "id",
+        "productId",
+        "quantity",
+        "purchaseDate",
+        "cost"
+      ]
+    },
+    "Receipt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Receipt",
+      "type": "object",
+      "description": "Represents a receipt for a sale or purchase.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Receipt entity."
+        },
+        "saleId": {
+          "type": "string",
+          "description": "Reference to Sale. (Relationship: Sale 1:N Receipt)"
+        },
+        "purchaseId": {
+          "type": "string",
+          "description": "Reference to Purchase. (Relationship: Purchase 1:N Receipt)"
+        },
+        "receiptDate": {
+          "type": "string",
+          "description": "Date of the receipt.",
+          "format": "date-time"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount on the receipt."
+        }
+      },
+      "required": [
+        "id",
+        "receiptDate",
+        "totalAmount"
+      ]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Represents an expense.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the expense."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the expense."
+        },
+        "expenseDate": {
+          "type": "string",
+          "description": "Date of the expense.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "amount",
+        "expenseDate"
+      ]
     },
     "Export": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Export",
       "type": "object",
       "description": "Represents an export order.",
       "properties": {
-        "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
-        "productId": { "type": "string" },
-        "destinationCountry": { "type": "string" },
-        "destinationPort": { "type": "string" },
-        "quantity": { "type": "number" },
-        "price": { "type": "number" },
-        "date": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["To-do", "In Progress", "Completed"] },
-        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] },
-        "invoiceNumber": { "type": "string" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Export entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to Client. (Relationship: Client 1:N Export)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N Export)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of product exported."
+        },
+        "exportDate": {
+          "type": "string",
+          "description": "Date of the export.",
+          "format": "date-time"
+        },
+        "destinationCountry": {
+          "type": "string",
+          "description": "Destination country of the export."
+        }
       },
-      "required": ["clientId", "clientName", "productId", "quantity", "price", "date", "status", "paymentStatus", "invoiceNumber"]
-    },
-    "LocalSale": {
-      "title": "Local Sale",
-      "type": "object",
-      "description": "Represents a local sale order.",
-      "properties": {
-        "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
-        "productId": { "type": "string" },
-        "quantity": { "type": "number" },
-        "price": { "type": "number" },
-        "date": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["To-do", "In Progress", "Completed"] },
-        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] },
-        "invoiceNumber": { "type": "string" }
-      },
-      "required": ["clientId", "clientName", "productId", "quantity", "price", "date", "status", "paymentStatus", "invoiceNumber"]
-    },
-    "CoconutPurchase": {
-      "title": "Coconut Purchase",
-      "type": "object",
-      "description": "Represents a purchase of coconuts.",
-      "properties": {
-        "clientId": { "type": "string" },
-        "clientName": { "type": "string" },
-        "quantity": { "type": "number" },
-        "price": { "type": "number" },
-        "date": { "type": "string", "format": "date-time" },
-        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] }
-      },
-      "required": ["clientId", "clientName", "quantity", "price", "date", "paymentStatus"]
+      "required": [
+        "id",
+        "clientId",
+        "productId",
+        "quantity",
+        "exportDate",
+        "destinationCountry"
+      ]
     }
   },
   "auth": {
@@ -122,33 +305,184 @@
     ]
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
-      "description": "Stores user profiles."
-    },
-    "/clients/{clientId}": {
-      "schema": { "$ref": "#/entities/Client" },
-      "description": "Stores client information."
-    },
-    "/products/{productId}": {
-      "schema": { "$ref": "#/entities/Product" },
-      "description": "Stores product stock information."
-    },
-    "/financial_transactions/{transactionId}": {
-      "schema": { "$ref": "#/entities/FinancialTransaction" },
-      "description": "Stores all financial transactions (income and expenses)."
-    },
-    "/exports/{exportId}": {
-      "schema": { "$ref": "#/entities/Export" },
-      "description": "Stores export order details."
-    },
-    "/local_sales/{saleId}": {
-      "schema": { "$ref": "#/entities/LocalSale" },
-      "description": "Stores local sale order details."
-    },
-    "/coconut_purchases/{purchaseId}": {
-      "schema": { "$ref": "#/entities/CoconutPurchase" },
-      "description": "Stores coconut purchase records."
-    }
+    "structure": [
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate that the user has the 'admin' role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The UID of the user who has the admin role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_manager/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate that the user has the 'manager' role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The UID of the user who has the manager role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_employee/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate that the user has the 'employee' role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The UID of the user who has the employee role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clients/{clientId}",
+        "definition": {
+          "entityName": "Client",
+          "schema": {
+            "$ref": "#/backend/entities/Client"
+          },
+          "description": "Stores client information.",
+          "params": [
+            {
+              "name": "clientId",
+              "description": "The unique ID of the client."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information.",
+          "params": [
+            {
+              "name": "productId",
+              "description": "The unique ID of the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stocks/{stockId}",
+        "definition": {
+          "entityName": "Stock",
+          "schema": {
+            "$ref": "#/backend/entities/Stock"
+          },
+          "description": "Stores stock level information for each product.",
+          "params": [
+            {
+              "name": "stockId",
+              "description": "The unique ID of the stock entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sale transaction information.",
+          "params": [
+            {
+              "name": "saleId",
+              "description": "The unique ID of the sale transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/purchases/{purchaseId}",
+        "definition": {
+          "entityName": "Purchase",
+          "schema": {
+            "$ref": "#/backend/entities/Purchase"
+          },
+          "description": "Stores purchase transaction information.",
+          "params": [
+            {
+              "name": "purchaseId",
+              "description": "The unique ID of the purchase transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/receipts/{receiptId}",
+        "definition": {
+          "entityName": "Receipt",
+          "schema": {
+            "$ref": "#/backend/entities/Receipt"
+          },
+          "description": "Stores receipt information for sales and purchases.",
+          "params": [
+            {
+              "name": "receiptId",
+              "description": "The unique ID of the receipt."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Expense",
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Stores expense information.",
+          "params": [
+            {
+              "name": "expenseId",
+              "description": "The unique ID of the expense."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/exports/{exportId}",
+        "definition": {
+          "entityName": "Export",
+          "schema": {
+            "$ref": "#/backend/entities/Export"
+          },
+          "description": "Stores export order information.",
+          "params": [
+            {
+              "name": "exportId",
+              "description": "The unique ID of the export order."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the HuskTrack application, focusing on secure role-based access and efficient data retrieval.  Authorization Independence is achieved through the use of dedicated role collections ( `/roles_admin/{uid}`, `/roles_manager/{uid}`, `/roles_employee/{uid}` ) which simplifies security rules and removes the need for `get()` calls, thus enabling atomic operations. Hierarchical paths are used where a `User` owns data (e.g., `/users/{userId}/expenses/{expenseId}`). For collaborative data or data requiring broader access, a membership map pattern within the document itself is preferable, but the current application does not require that approach.\n\nThe structure also supports the required QAPs:\n\n*   **Secure List Operations:** Segregation is enforced by placing different entities into distinct collections (e.g., `clients`, `products`, `sales`), ensuring homogeneous security postures. This prevents rule-based filtering and enables secure `list` operations because the rules apply consistently to all documents within a collection.\n*   **Role-Based Access Control:** The use of role-based collections, checked via `exists()` in security rules, allows for fine-grained control over who can access and modify data. This existence check is efficient and scalable.\n*   **Data Integrity:** Consistent naming conventions and explicit state modeling (though not present in the current schema) can be enforced through validation rules to ensure data integrity."
   }
 }

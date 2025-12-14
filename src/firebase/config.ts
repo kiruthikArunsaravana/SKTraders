@@ -1,13 +1,8 @@
-
-'use client';
-
-// This is the correct, hardcoded Firebase configuration for your project.
-// This permanently resolves the deployment issues on Vercel.
 export const firebaseConfig = {
-  projectId: 'husktrack2-37640420',
-  appId: '1:1077942344581:web:99bb0926f9b6aa30a442ec',
-  apiKey: 'AIzaSyD2Ww8RFwIXHCyxAKP0TFNna10YeLMCChQ',
-  authDomain: 'husktrack2-37640420.firebaseapp.com',
-  messagingSenderId: '1077942344581',
-  storageBucket: 'husktrack2-37640420.appspot.com'
+  "projectId": "tracker-with-coconut-488-edd4f",
+  "appId": "1:933855061938:web:99bda7e381824ce8ee66ab",
+  "apiKey": "AIzaSyASQoE3m-ebhuV1p1XPOn6zJP-Zi0AcXiE",
+  "authDomain": "tracker-with-coconut-488-edd4f.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "933855061938"
 };

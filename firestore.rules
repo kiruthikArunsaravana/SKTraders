@@ -1,9 +1,228 @@
-
+/**
+ * This ruleset enforces a strict, role-based access control (RBAC) model for the HuskTrack application.
+ * A user's permissions are determined by their role (Admin, Manager, or Employee), which is checked
+ * against dedicated role collections.
+ *
+ * Core Philosophy:
+ * Access is granted based on pre-defined roles, not on individual data ownership. This is suitable
+ * for business applications where permissions are tied to job functions rather than content creation.
+ * Admins have full control, Managers handle day-to-day business data and employees, and Employees
+ * have read-only access to business data.
+ *
+ * Data Structure:
+ * The data is organized into flat, top-level collections for each business entity (e.g., /clients, /products).
+ * This structural segregation ensures that a single, clear security policy can be applied to all
+ * documents within a collection, enabling secure and performant list queries. User roles are managed
+ * in separate top-level collections (/roles_admin, /roles_manager, /roles_employee), serving as a
+ * centralized and efficient lookup system for authorization.
+ *
+ * Key Security Decisions:
+ * - Role-Based Authorization: Instead of denormalizing an ownerId onto every document, this ruleset uses
+ *   efficient `exists()` checks against the role collections. This centralizes role management and
+ *   simplifies rules for business data collections.
+ * - Default Deny: All access is denied by default. Unauthenticated users and authenticated users
+ *   without an assigned role have no access to any data.
+ * - Granular Role Permissions: Admins have unrestricted access. Managers can read all business data
+ *   and modify most of it, but are restricted from altering foundational data like products. Employees
+ *   are granted read-only access to business data, providing visibility without allowing modification.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // --------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the user has the 'Admin' role by verifying the existence
+     * of a document in the /roles_admin collection with their UID.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Checks if the user has the 'Manager' role.
+     */
+    function isManager() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_manager/$(request.auth.uid));
+    }
+
+    /**
+     * Checks if the user has the 'Employee' role.
+     */
+    function isEmployee() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_employee/$(request.auth.uid));
+    }
+
+    /**
+     * A convenience function to check if a user is either a Manager or an Admin.
+     */
+    function isManagerOrAdmin() {
+      return isManager() || isAdmin();
+    }
+    
+    /**
+     * A convenience function to check if a user has any valid role in the system.
+     */
+    function hasAnyRole() {
+      return isEmployee() || isManager() || isAdmin();
+    }
+
+    // --------------------------------------------------------------------
+    // Role Management Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Manages documents that grant users the 'Admin' role.
+     * @path /roles_admin/{userId}
+     * @allow An Admin (uid: 'admin_user') deleting another admin's role document (delete).
+     * @deny A Manager (uid: 'manager_user') trying to read the list of admins (list).
+     * @principle Enforces strict control over the highest privilege level; only Admins can manage other Admins.
+     */
+    match /roles_admin/{userId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Manages documents that grant users the 'Manager' role.
+     * @path /roles_manager/{userId}
+     * @allow An Admin (uid: 'admin_user') creating a new manager role document (create).
+     * @deny A Manager (uid: 'manager_user') trying to delete their own role document (delete).
+     * @principle Centralizes control of managerial roles to Admins, preventing privilege escalation.
+     */
+    match /roles_manager/{userId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Manages documents that grant users the 'Employee' role.
+     * @path /roles_employee/{userId}
+     * @allow A Manager (uid: 'manager_user') creating a role document for a new employee (create).
+     * @deny An Employee (uid: 'employee_user') trying to view the list of all employees (list).
+     * @principle Allows Managers and Admins to manage the employee user base.
+     */
+    match /roles_employee/{userId} {
+      allow get, list: if isManagerOrAdmin();
+      allow create, update, delete: if isManagerOrAdmin();
+    }
+
+    // --------------------------------------------------------------------
+    // Business Data Collections
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Stores information about company clients.
+     * @path /clients/{clientId}
+     * @allow An Employee (uid: 'employee_user') reading a client's details (get).
+     * @deny An Employee (uid: 'employee_user') trying to create a new client (create).
+     * @principle Grants read access to all roles but restricts write access to management (Manager, Admin).
+     */
+    match /clients/{clientId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores foundational product catalog information.
+     * @path /products/{productId}
+     * @allow A Manager (uid: 'manager_user') reading product details (get).
+     * @deny A Manager (uid: 'manager_user') trying to add a new product (create).
+     * @principle Protects core business data by restricting write access to only Admins.
+     */
+    match /products/{productId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores stock levels for each product.
+     * @path /stocks/{stockId}
+     * @allow A Manager (uid: 'manager_user') updating the quantity of a stock item (update).
+     * @deny An Employee (uid: 'employee_user') trying to delete a stock entry (delete).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /stocks/{stockId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores records of sales transactions.
+     * @path /sales/{saleId}
+     * @allow A Manager (uid: 'manager_user') creating a new sale record (create).
+     * @deny A user with no assigned role trying to read sales data (get).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /sales/{saleId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores records of purchase transactions.
+     * @path /purchases/{purchaseId}
+     * @allow An Admin (uid: 'admin_user') deleting a mistaken purchase entry (delete).
+     * @deny An Employee (uid: 'employee_user') trying to create a new purchase record (create).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /purchases/{purchaseId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores receipts for sales and purchases.
+     * @path /receipts/{receiptId}
+     * @allow An Employee (uid: 'employee_user') viewing a receipt (get).
+     * @deny An Employee (uid: 'employee_user') trying to update a receipt (update).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /receipts/{receiptId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores records of company expenses.
+     * @path /expenses/{expenseId}
+     * @allow A Manager (uid: 'manager_user') creating a new expense record (create).
+     * @deny An Employee (uid: 'employee_user') trying to delete an expense (delete).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /expenses/{expenseId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
+    }
+
+    /**
+     * @description Stores records of export orders.
+     * @path /exports/{exportId}
+     * @allow An Admin (uid: 'admin_user') viewing the list of all exports (list).
+     * @deny An Employee (uid: 'employee_user') trying to create a new export record (create).
+     * @principle Grants read access to all roles but restricts write access to management.
+     */
+    match /exports/{exportId} {
+      allow get, list: if hasAnyRole();
+      allow create: if isManagerOrAdmin();
+      allow update, delete: if isManagerOrAdmin() && resource != null;
     }
   }
 }
