@@ -13,10 +13,12 @@
  *
  * Key Security Decisions:
  * - User listing is disabled to prevent data harvesting.
- * - Write access to all collections (except users) is allowed for any signed-in
- *   user to simplify development. This is a permissive rule for prototyping.
- * - A specific `allow get` is added to products to allow transactions to read
+ * - Write access to most collections is allowed for any signed-in user to
+ *   simplify development. This is a permissive rule for prototyping.
+ * - Specific `allow get` is added to products to allow transactions to read
  *   stock levels before updating.
+ * - Specific `allow write` is added to financial and purchase collections
+ *   to ensure transactional integrity.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -38,8 +40,24 @@ service cloud.firestore {
     }
 
     /**
-     * @description Allows any authenticated user to read and write to any other collection.
-     * This is a permissive rule for rapid development.
+     * @description Allows writes to financial transactions, necessary for recording expenses
+     * during a purchase.
+     */
+    match /financial_transactions/{transactionId} {
+      allow write: if request.auth != null;
+    }
+    
+    /**
+     * @description Allows writes to coconut purchases, necessary for recording the purchase
+     * during a transaction.
+     */
+    match /coconut_purchases/{purchaseId} {
+        allow write: if request.auth != null;
+    }
+
+    /**
+     * @description Allows any authenticated user to read from any other collection.
+     * Write access is handled by more specific rules or the general match below.
      */
     match /{document=**} {
       allow read, write: if request.auth != null;
