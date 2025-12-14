@@ -1,8 +1,8 @@
 export const firebaseConfig = {
-  "projectId": "husktrack2-37640420",
-  "appId": "1:332997424693:web:113c05c158028788a8762b",
-  "storageBucket": "husktrack2-37640420.appspot.com",
-  "apiKey": "AIzaSyAZL4UT0kFp6XIxG_8T92nIQ2jPdkjVn9I",
-  "authDomain": "husktrack2-37640420.firebaseapp.com",
-  "messagingSenderId": "332997424693"
+  "projectId": "husktrack2-dd15c",
+  "appId": "1:931235659854:web:0d33c3938ad8259747d7c6",
+  "storageBucket": "husktrack2-dd15c.appspot.com",
+  "apiKey": "AIzaSyChhF2N2pC89p1aJKwj-YQMXtgA48n_yXU",
+  "authDomain": "husktrack2-dd15c.firebaseapp.com",
+  "messagingSenderId": "931235659854"
 };
