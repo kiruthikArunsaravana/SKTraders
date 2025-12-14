@@ -265,5 +265,18 @@ service cloud.firestore {
       allow create: if canWriteBusinessData();
       allow update, delete: if canWriteBusinessData() && docExists();
     }
+
+    /**
+     * @description Controls access to financial transaction records.
+     * @path /financial_transactions/{transactionId}
+     * @allow (create) Admins and Managers can create new transactions.
+     * @deny (update) An Employee cannot update a transaction.
+     * @principle Enforces Role-Based Access Control (RBAC) for financial data.
+     */
+    match /financial_transactions/{transactionId} {
+      allow get, list: if canReadBusinessData();
+      allow create: if canWriteBusinessData();
+      allow update, delete: if canWriteBusinessData() && docExists();
+    }
   }
 }
