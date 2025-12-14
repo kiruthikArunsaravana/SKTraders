@@ -1,8 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: This rule is insecure and allows anyone to read and write to your database.
-    // It is intended for initial development and debugging ONLY.
     match /{document=**} {
       allow read, write: if true;
     }

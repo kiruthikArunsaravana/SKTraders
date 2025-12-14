@@ -1,5 +1,5 @@
 'use client';
-    
+
 import { useState, useEffect } from 'react';
 import {
   DocumentReference,
@@ -19,13 +19,13 @@ type WithId<T> = T & { id: string };
 export interface UseDocResult<T> {
   data: WithId<T> | null; // Document data with ID, or null.
   isLoading: boolean;       // True if loading.
-  error: FirestoreError | Error | null; // Error object, or null.
+  error: FirestoreError | null; // Error object, or null.
 }
 
 /**
  * React hook to subscribe to a single Firestore document in real-time.
  * Handles nullable references.
- * 
+ *
  * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
  * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
  * references
@@ -42,8 +42,8 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<FirestoreError | null>(null);
 
   useEffect(() => {
     if (!memoizedDocRef) {
@@ -55,7 +55,6 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
@@ -74,7 +73,7 @@ export function useDoc<T = any>(
         setError(err);
         setData(null);
         setIsLoading(false);
-        console.error(err); // Log the actual error to the console
+        console.error("useDoc error:", err); // Log the actual error to the console
       }
     );
 
