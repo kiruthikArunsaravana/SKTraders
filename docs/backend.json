@@ -4,20 +4,24 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the HuskTrack system.",
+      "description": "Represents a user within the system.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the User entity."
+          "description": "Unique identifier for the user."
         },
         "email": {
           "type": "string",
-          "description": "User's email address.",
+          "description": "Email address of the user.",
           "format": "email"
         },
         "role": {
           "type": "string",
           "description": "Role of the user (Admin, Manager, Employee)."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "Google ID of the user (for OAuth login)."
         }
       },
       "required": [
@@ -34,25 +38,24 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Client entity."
+          "description": "Unique identifier for the client."
         },
         "name": {
           "type": "string",
-          "description": "Client's name."
+          "description": "Name of the client."
         },
         "contactInfo": {
           "type": "string",
-          "description": "Client's contact information."
+          "description": "Contact information of the client (e.g., phone number, address)."
         },
         "exportPreferences": {
           "type": "string",
-          "description": "Client's export preferences."
+          "description": "Export preferences of the client."
         }
       },
       "required": [
         "id",
-        "name",
-        "contactInfo"
+        "name"
       ]
     },
     "Product": {
@@ -63,15 +66,15 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Product entity."
+          "description": "Unique identifier for the product."
         },
         "name": {
           "type": "string",
-          "description": "Product name."
+          "description": "Name of the product."
         },
         "description": {
           "type": "string",
-          "description": "Product description."
+          "description": "Description of the product."
         }
       },
       "required": [
@@ -87,7 +90,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Stock entity."
+          "description": "Unique identifier for the stock entry."
         },
         "productId": {
           "type": "string",
@@ -122,7 +125,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Sale entity."
+          "description": "Unique identifier for the sale transaction."
         },
         "clientId": {
           "type": "string",
@@ -134,7 +137,7 @@
         },
         "quantity": {
           "type": "number",
-          "description": "Quantity of product sold."
+          "description": "Quantity of the product sold."
         },
         "saleDate": {
           "type": "string",
@@ -143,7 +146,7 @@
         },
         "totalAmount": {
           "type": "number",
-          "description": "Total amount of the sale."
+          "description": "Total amount of sales."
         }
       },
       "required": [
@@ -151,19 +154,18 @@
         "clientId",
         "productId",
         "quantity",
-        "saleDate",
-        "totalAmount"
+        "saleDate"
       ]
     },
     "Purchase": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Purchase",
       "type": "object",
-      "description": "Represents a purchase transaction of raw husk.",
+      "description": "Represents a purchase transaction (raw husk).",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Purchase entity."
+          "description": "Unique identifier for the purchase transaction."
         },
         "productId": {
           "type": "string",
@@ -171,24 +173,23 @@
         },
         "quantity": {
           "type": "number",
-          "description": "Quantity of husk purchased."
+          "description": "Quantity of the product purchased."
         },
         "purchaseDate": {
           "type": "string",
           "description": "Date of the purchase.",
           "format": "date-time"
         },
-        "cost": {
+        "totalAmount": {
           "type": "number",
-          "description": "Cost of the purchase."
+          "description": "Total amount of purchase."
         }
       },
       "required": [
         "id",
         "productId",
         "quantity",
-        "purchaseDate",
-        "cost"
+        "purchaseDate"
       ]
     },
     "Receipt": {
@@ -199,15 +200,15 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Receipt entity."
+          "description": "Unique identifier for the receipt."
         },
         "saleId": {
           "type": "string",
-          "description": "Reference to Sale. (Relationship: Sale 1:N Receipt)"
+          "description": "Reference to Sale. (Relationship: Sale 1:1 Receipt)"
         },
         "purchaseId": {
           "type": "string",
-          "description": "Reference to Purchase. (Relationship: Purchase 1:N Receipt)"
+          "description": "Reference to Purchase. (Relationship: Purchase 1:1 Receipt)"
         },
         "receiptDate": {
           "type": "string",
@@ -216,13 +217,16 @@
         },
         "totalAmount": {
           "type": "number",
-          "description": "Total amount on the receipt."
+          "description": "Total Amount on the receipt"
+        },
+        "tax": {
+          "type": "number",
+          "description": "Tax applied on the product"
         }
       },
       "required": [
         "id",
-        "receiptDate",
-        "totalAmount"
+        "receiptDate"
       ]
     },
     "Expense": {
@@ -233,7 +237,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Expense entity."
+          "description": "Unique identifier for the expense."
         },
         "description": {
           "type": "string",
@@ -264,37 +268,34 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Export entity."
+          "description": "Unique identifier for the export order."
         },
-        "clientId": {
+        "internationalBuyerDetails": {
           "type": "string",
-          "description": "Reference to Client. (Relationship: Client 1:N Export)"
+          "description": "Details of the international buyer (company name, country, port, contact)."
         },
         "productId": {
           "type": "string",
           "description": "Reference to Product. (Relationship: Product 1:N Export)"
-        },
-        "quantity": {
-          "type": "number",
-          "description": "Quantity of product exported."
         },
         "exportDate": {
           "type": "string",
           "description": "Date of the export.",
           "format": "date-time"
         },
-        "destinationCountry": {
-          "type": "string",
-          "description": "Destination country of the export."
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of the product."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total amount of export."
         }
       },
       "required": [
         "id",
-        "clientId",
-        "productId",
-        "quantity",
-        "exportDate",
-        "destinationCountry"
+        "internationalBuyerDetails",
+        "exportDate"
       ]
     }
   },
@@ -307,49 +308,17 @@
   "firestore": {
     "structure": [
       {
-        "path": "/roles_admin/{userId}",
+        "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Documents in this collection indicate that the user has the 'admin' role.",
+          "description": "Stores user data. Path-based ownership ensures only the user can access their own data.",
           "params": [
             {
               "name": "userId",
-              "description": "The UID of the user who has the admin role."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_manager/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Documents in this collection indicate that the user has the 'manager' role.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The UID of the user who has the manager role."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_employee/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Documents in this collection indicate that the user has the 'employee' role.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The UID of the user who has the employee role."
+              "description": "The unique identifier of the user."
             }
           ]
         }
@@ -361,11 +330,11 @@
           "schema": {
             "$ref": "#/backend/entities/Client"
           },
-          "description": "Stores client information.",
+          "description": "Stores client data. Accessible to admins and managers.",
           "params": [
             {
               "name": "clientId",
-              "description": "The unique ID of the client."
+              "description": "The unique identifier of the client."
             }
           ]
         }
@@ -377,59 +346,71 @@
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product information.",
+          "description": "Stores product information. Accessible to admins.",
           "params": [
             {
               "name": "productId",
-              "description": "The unique ID of the product."
+              "description": "The unique identifier of the product."
             }
           ]
         }
       },
       {
-        "path": "/stocks/{stockId}",
+        "path": "/products/{productId}/stock/{stockId}",
         "definition": {
           "entityName": "Stock",
           "schema": {
             "$ref": "#/backend/entities/Stock"
           },
-          "description": "Stores stock level information for each product.",
+          "description": "Stores stock levels for each product. Requires admin or manager role. Includes denormalized data if needed (e.g., product name).",
           "params": [
             {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            },
+            {
               "name": "stockId",
-              "description": "The unique ID of the stock entry."
+              "description": "The unique identifier of the stock entry."
             }
           ]
         }
       },
       {
-        "path": "/sales/{saleId}",
+        "path": "/clients/{clientId}/sales/{saleId}",
         "definition": {
           "entityName": "Sale",
           "schema": {
             "$ref": "#/backend/entities/Sale"
           },
-          "description": "Stores sale transaction information.",
+          "description": "Stores sales data associated with a client. Includes denormalized client and product names for authorization independence.",
           "params": [
             {
+              "name": "clientId",
+              "description": "The unique identifier of the client."
+            },
+            {
               "name": "saleId",
-              "description": "The unique ID of the sale transaction."
+              "description": "The unique identifier of the sale."
             }
           ]
         }
       },
       {
-        "path": "/purchases/{purchaseId}",
+        "path": "/products/{productId}/purchases/{purchaseId}",
         "definition": {
           "entityName": "Purchase",
           "schema": {
             "$ref": "#/backend/entities/Purchase"
           },
-          "description": "Stores purchase transaction information.",
+          "description": "Stores purchase data for each product. Includes denormalized product name for authorization independence.",
           "params": [
             {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            },
+            {
               "name": "purchaseId",
-              "description": "The unique ID of the purchase transaction."
+              "description": "The unique identifier of the purchase."
             }
           ]
         }
@@ -441,11 +422,11 @@
           "schema": {
             "$ref": "#/backend/entities/Receipt"
           },
-          "description": "Stores receipt information for sales and purchases.",
+          "description": "Stores receipt data.",
           "params": [
             {
               "name": "receiptId",
-              "description": "The unique ID of the receipt."
+              "description": "The unique identifier of the receipt."
             }
           ]
         }
@@ -457,32 +438,52 @@
           "schema": {
             "$ref": "#/backend/entities/Expense"
           },
-          "description": "Stores expense information.",
+          "description": "Stores expense data. Accessible to admins and managers.",
           "params": [
             {
               "name": "expenseId",
-              "description": "The unique ID of the expense."
+              "description": "The unique identifier of the expense."
             }
           ]
         }
       },
       {
-        "path": "/exports/{exportId}",
+        "path": "/products/{productId}/exports/{exportId}",
         "definition": {
           "entityName": "Export",
           "schema": {
             "$ref": "#/backend/entities/Export"
           },
-          "description": "Stores export order information.",
+          "description": "Stores export data. Includes denormalized product name for authorization independence.",
           "params": [
             {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            },
+            {
               "name": "exportId",
-              "description": "The unique ID of the export order."
+              "description": "The unique identifier of the export."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "adminRole",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection to store UIDs of admin users. Existence of a document grants admin role.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The unique identifier of the user with admin role."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the HuskTrack application, focusing on secure role-based access and efficient data retrieval.  Authorization Independence is achieved through the use of dedicated role collections ( `/roles_admin/{uid}`, `/roles_manager/{uid}`, `/roles_employee/{uid}` ) which simplifies security rules and removes the need for `get()` calls, thus enabling atomic operations. Hierarchical paths are used where a `User` owns data (e.g., `/users/{userId}/expenses/{expenseId}`). For collaborative data or data requiring broader access, a membership map pattern within the document itself is preferable, but the current application does not require that approach.\n\nThe structure also supports the required QAPs:\n\n*   **Secure List Operations:** Segregation is enforced by placing different entities into distinct collections (e.g., `clients`, `products`, `sales`), ensuring homogeneous security postures. This prevents rule-based filtering and enables secure `list` operations because the rules apply consistently to all documents within a collection.\n*   **Role-Based Access Control:** The use of role-based collections, checked via `exists()` in security rules, allows for fine-grained control over who can access and modify data. This existence check is efficient and scalable.\n*   **Data Integrity:** Consistent naming conventions and explicit state modeling (though not present in the current schema) can be enforced through validation rules to ensure data integrity."
+    "reasoning": "The Firestore data structure is designed to ensure security, scalability, and ease of debugging, adhering to the core design principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization of authorization-related data, eliminating the need for `get()` calls in security rules. Structural Segregation is employed to maintain a homogeneous security posture within each collection. Access Modeling follows consistent patterns for private, user-owned, collaborative, and global roles.\n\n*   **Users:** User data is stored in the `/users/{userId}` collection, ensuring path-based ownership for private data. This approach provides simple and secure access control based on `request.auth.uid`.\n*   **Clients:** Client data is stored in the `/clients/{clientId}` collection. No specific ownership is defined here. Admin or manager roles can be configured to manage clients.\n*   **Products:** Product data is stored in the `/products/{productId}` collection. Admin roles can be configured to manage Products.\n*   **Stock:** Stock data is stored in the `/products/{productId}/stock/{stockId}` subcollection, establishing a clear ownership hierarchy. This design enables secure stock management based on product ownership.\n*   **Sales:** Sale data is stored in the `/clients/{clientId}/sales/{saleId}` subcollection to ensure access control tied to the client. Critical properties from Product (name) and Client (name) will be denormalized into the Sale document to ensure Authorization Independence.\n*   **Purchases:** Purchase data is stored in the `/products/{productId}/purchases/{purchaseId}` subcollection, creating a clear hierarchy. Properties from Product are denormalized into the Purchase document to guarantee Authorization Independence.\n*   **Receipts:** Receipts are stored in `/receipts/{receiptId}`. The `saleId` and `purchaseId` fields can be used to query the receipts. The choice of collection is justified by the 1:1 relationship with sales and purchases which allows atomic operations when creating the receipts.\n*   **Expenses:** Expenses are stored in the `/expenses/{expenseId}` collection. Expense-related data is segregated for distinct access control.\n*   **Exports:** Export data is stored in the `/products/{productId}/exports/{exportId}` subcollection, maintaining a hierarchical structure. Properties from the product document are denormalized to enable Authorization Independence.\n*   **Roles:** The `/roles_admin/{uid}` collection is used to assign admin roles. The existence of a document in this collection grants admin privileges. This approach simplifies global role management and enhances security.\n\nThis structure facilitates secure `list` operations (QAPs) through structural segregation, path-based ownership, and membership maps. It eliminates the need for complex filtering rules and ensures that only authorized data is accessed. Denormalization ensures that authorization checks can be performed without relying on `get()` calls, maintaining atomic operations and simplifying debugging."
   }
 }

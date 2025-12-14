@@ -1,8 +1,269 @@
 rules_version = '2';
+
+/**
+ * @name SK Traders Inventory Management Security Rules
+ * @file firestore.rules
+ *
+ * @description
+ * This ruleset enforces a Role-Based Access Control (RBAC) model for an
+ * inventory and sales management application. Access is primarily determined
+ * by a user's role (Admin, Manager, Employee) stored on their user profile,
+ * with a special, high-performance check for administrators.
+ *
+ * @philosophy
+ * Core Philosophy: The security model is centered around three user roles:
+ * - Admins: Have full control over all data, including user roles. Managed via
+ *   a dedicated `/roles_admin` collection for fast, secure lookups.
+ * - Managers: Can create, update, and delete core business data like clients,
+ *   stock, sales, and expenses. They cannot manage products or other users.
+ * - Employees: Have read-only access to most business data to view inventory,
+ *   sales, etc., but cannot make any modifications.
+ *
+ * @structure
+ * Data Structure:
+ * - `/users/{userId}`: Contains private user profiles, including their role.
+ *   Each user can only access their own document.
+ * - `/roles_admin/{uid}`: A special collection where the existence of a
+ *   document indicates the user is an administrator. This provides a fast
+ *   and secure way to check for admin privileges without reading a full user
+ *   document.
+ * - Top-level collections like `/clients`, `/products`, `/expenses`, and
+ *   `/receipts` store the primary business data, secured by roles.
+ * - Subcollections like `/products/{productId}/stock` and `/clients/{clientId}/sales`
+ *   create logical data hierarchies. Their security depends on the user's
+ *   role, not on the parent document.
+ *
+ * @decisions
+ * Key Security Decisions:
+ * - Hybrid Role System: A user's base role ('Manager', 'Employee') is read
+ *   from their own `/users/{userId}` document. The 'Admin' role is checked
+ *   via a more performant `exists()` call to the `/roles_admin` collection.
+ *   This is a secure and common pattern for elevating privileges.
+ * - Read-Only for Employees: The 'Employee' role is consistently granted
+ *   read-only access to business data, preventing accidental or unauthorized
+ *   modifications.
+ * - Admin-Only Collections: Critical data like `/products` and the `/roles_admin`
+ *   collection are restricted to Admins only.
+ * - No Public Access: All collections require users to be signed in. There
+ *   is no publicly readable or writable data.
+ * - No User Listing: It is not possible to list documents in the `/users`
+ *   collection, protecting user privacy.
+ *
+ * @denormalization
+ * Denormalization for Authorization: This ruleset relies on a `role` field
+ * being present on each user's document in `/users/{userId}`. This is a form of
+ * denormalization that avoids complex lookups. For path consistency in
+ * subcollections, documents are expected to contain a field referencing their
+ * parent's ID (e.g., a 'stock' document must have a `productId` field).
+ *
+ * @segregation
+ * Structural Segregation: User data (`/users`) is strictly segregated from
+ * business data. The `/roles_admin` collection is also separate, allowing for
+ * highly restrictive rules to protect its integrity. This separation ensures
+ * clear, simple, and secure rules for each data type.
+ */
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns true if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the request is from the owner of a specific document/path.
+     * @param userId The user ID to check against the authenticated user's UID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the document being updated or deleted already exists.
+     * Prevents operations on non-existent documents.
+     */
+    function docExists() {
+      return resource != null;
+    }
+
+    /**
+     * Checks if the user has the 'Admin' role.
+     * This is done by checking for the existence of a document in the
+     * special `roles_admin` collection, which is faster and cheaper than a `get`.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Retrieves the role string ('Manager', 'Employee', etc.) from the
+     * currently authenticated user's profile document.
+     */
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+
+
+    /**
+     * Determines if a user has permission to read business data.
+     * Granted to Admins, Managers, and Employees.
+     */
+    function canReadBusinessData() {
+      return isSignedIn() && (isAdmin() || getUserRole() in ['Manager', 'Employee']);
+    }
+
+    /**
+     * Determines if a user has permission to write (create, update, delete) business data.
+     * Granted to Admins and Managers.
+     */
+    function canWriteBusinessData() {
+      return isSignedIn() && (isAdmin() || getUserRole() == 'Manager');
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to user profile data.
+     * @path /users/{userId}
+     * @allow (create) A new user can create their own profile document.
+     * @deny (get) A user cannot read another user's profile.
+     * @principle Restricts access to a user's own data tree. Enforces self-creation.
+     */
+    match /users/{userId} {
+      allow get, list, update: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow delete: if isOwner(userId) && docExists();
+    }
+
+    /**
+     * @description Controls access to the special collection for managing Admin roles.
+     * @path /roles_admin/{uid}
+     * @allow (create) An existing Admin can grant admin privileges to another user.
+     * @deny (list) Listing all admins is forbidden to prevent user enumeration.
+     * @principle Protects privilege escalation. Only Admins can manage other Admins.
+     */
+    match /roles_admin/{uid} {
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin() && docExists();
+    }
+
+    /**
+     * @description Controls access to client records.
+     * @path /clients/{clientId}
+     * @allow (create) Admins and Managers can create new clients.
+     * @deny (update) An Employee cannot update a client's information.
+     * @principle Enforces Role-Based Access Control (RBAC) for business data.
+     */
+    match /clients/{clientId} {
+      allow get, list: if canReadBusinessData();
+      allow create: if canWriteBusinessData();
+      allow update, delete: if canWriteBusinessData() && docExists();
+
+      /**
+       * @description Controls access to sales records for a specific client.
+       * @path /clients/{clientId}/sales/{saleId}
+       * @allow (create) An Admin or Manager can create a sale for a client.
+       * @deny (create) An Employee cannot create a sale.
+       * @principle Enforces RBAC and validates relational integrity between parent/child documents.
+       */
+      match /sales/{saleId} {
+        allow get, list: if canReadBusinessData();
+        allow create: if canWriteBusinessData() && request.resource.data.clientId == clientId;
+        allow update: if canWriteBusinessData() && docExists() && request.resource.data.clientId == resource.data.clientId;
+        allow delete: if canWriteBusinessData() && docExists();
+      }
+    }
+
+    /**
+     * @description Controls access to product definitions. This is a sensitive collection.
+     * @path /products/{productId}
+     * @allow (create) Only an Admin can create a new product.
+     * @deny (update) A Manager cannot update an existing product.
+     * @principle Enforces strict, Admin-only control over core business definitions.
+     */
+    match /products/{productId} {
+      allow get, list: if canReadBusinessData();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin() && docExists();
+
+      /**
+       * @description Controls access to stock levels for a specific product.
+       * @path /products/{productId}/stock/{stockId}
+       * @allow (create) An Admin or Manager can add a stock entry for a product.
+       * @deny (delete) An Employee cannot delete a stock record.
+       * @principle Enforces RBAC and validates relational integrity between parent/child documents.
+       */
+      match /stock/{stockId} {
+        allow get, list: if canReadBusinessData();
+        allow create: if canWriteBusinessData() && request.resource.data.productId == productId;
+        allow update: if canWriteBusinessData() && docExists() && request.resource.data.productId == resource.data.productId;
+        allow delete: if canWriteBusinessData() && docExists();
+      }
+
+      /**
+       * @description Controls access to purchase records for a specific product.
+       * @path /products/{productId}/purchases/{purchaseId}
+       * @allow (create) An Admin or Manager can log a new purchase for a product.
+       * @deny (create) An employee cannot create a purchase record.
+       * @principle Enforces RBAC and validates relational integrity between parent/child documents.
+       */
+      match /purchases/{purchaseId} {
+        allow get, list: if canReadBusinessData();
+        allow create: if canWriteBusinessData() && request.resource.data.productId == productId;
+        allow update: if canWriteBusinessData() && docExists() && request.resource.data.productId == resource.data.productId;
+        allow delete: if canWriteBusinessData() && docExists();
+      }
+
+      /**
+       * @description Controls access to export orders for a specific product.
+       * @path /products/{productId}/exports/{exportId}
+       * @allow (create) An Admin or Manager can create a new export order.
+       * @deny (update) An Employee cannot modify an export order.
+       * @principle Enforces RBAC and validates relational integrity between parent/child documents.
+       */
+      match /exports/{exportId} {
+        allow get, list: if canReadBusinessData();
+        allow create: if canWriteBusinessData() && request.resource.data.productId == productId;
+        allow update: if canWriteBusinessData() && docExists() && request.resource.data.productId == resource.data.productId;
+        allow delete: if canWriteBusinessData() && docExists();
+      }
+    }
+
+    /**
+     * @description Controls access to receipt records.
+     * @path /receipts/{receiptId}
+     * @allow (get) Any signed-in employee, manager, or admin can view a receipt.
+     * @deny (delete) An Employee cannot delete a receipt.
+     * @principle Enforces Role-Based Access Control (RBAC) for business documents.
+     */
+    match /receipts/{receiptId} {
+      allow get, list: if canReadBusinessData();
+      allow create: if canWriteBusinessData();
+      allow update, delete: if canWriteBusinessData() && docExists();
+    }
+
+    /**
+     * @description Controls access to expense records.
+     * @path /expenses/{expenseId}
+     * @allow (create) An Admin or Manager can log a new expense.
+     * @deny (update) An Employee cannot modify an expense.
+     * @principle Enforces Role-Based Access Control (RBAC) for financial data.
+     */
+    match /expenses/{expenseId} {
+      allow get, list: if canReadBusinessData();
+      allow create: if canWriteBusinessData();
+      allow update, delete: if canWriteBusinessData() && docExists();
     }
   }
 }
