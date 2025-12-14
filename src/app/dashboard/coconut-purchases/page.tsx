@@ -17,7 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, Timestamp, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -95,54 +95,55 @@ export default function CoconutPurchasesPage() {
     const totalAmount = quantity * price;
 
     try {
-        const productRef = doc(firestore, 'products', 'coconut');
-        const productDoc = await getDoc(productRef);
+        await runTransaction(firestore, async (transaction) => {
+            const productRef = doc(firestore, 'products', 'coconut');
+            const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
+            const transactionRef = doc(collection(firestore, 'financial_transactions'));
 
-        let newQuantity;
-        if (!productDoc.exists()) {
-            newQuantity = quantity;
-        } else {
-            const currentQuantity = productDoc.data().quantity || 0;
-            newQuantity = currentQuantity + quantity;
-        }
+            // 1. Read the current product stock first.
+            const productDoc = await transaction.get(productRef);
 
-        const batch = writeBatch(firestore);
+            let newQuantity;
+            if (!productDoc.exists()) {
+                newQuantity = quantity;
+            } else {
+                const currentQuantity = productDoc.data().quantity || 0;
+                newQuantity = currentQuantity + quantity;
+            }
+            
+            // 2. Perform all write operations.
+            if (!productDoc.exists()) {
+                 transaction.set(productRef, {
+                    name: "Coconut",
+                    quantity: newQuantity,
+                    costPrice: 10,
+                    sellingPrice: 15,
+                    modifiedDate: purchaseDate,
+                });
+            } else {
+                transaction.update(productRef, { quantity: newQuantity, modifiedDate: purchaseDate });
+            }
 
-        if (!productDoc.exists()) {
-            batch.set(productRef, {
-                name: "Coconut",
-                quantity: newQuantity,
-                costPrice: 10,
-                sellingPrice: 15,
-                modifiedDate: purchaseDate,
+            const newPurchaseData: Omit<CoconutPurchase, 'id'> = {
+                clientId: client.id,
+                clientName: client.companyName,
+                quantity,
+                price,
+                date: purchaseDate,
+                paymentStatus,
+            };
+            transaction.set(purchaseRef, newPurchaseData);
+
+            transaction.set(transactionRef, {
+                type: 'expense',
+                amount: -totalAmount,
+                description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
+                category: 'Coconut',
+                date: purchaseDate,
+                clientName: client.companyName,
+                quantity: quantity,
             });
-        } else {
-            batch.update(productRef, { quantity: newQuantity, modifiedDate: purchaseDate });
-        }
-        
-        const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
-        const newPurchaseData: Omit<CoconutPurchase, 'id'> = {
-            clientId: client.id,
-            clientName: client.companyName,
-            quantity,
-            price,
-            date: purchaseDate,
-            paymentStatus,
-        };
-        batch.set(purchaseRef, newPurchaseData);
-
-        const transactionRef = doc(collection(firestore, 'financial_transactions'));
-        batch.set(transactionRef, {
-            type: 'expense',
-            amount: -totalAmount,
-            description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
-            category: 'Coconut',
-            date: purchaseDate,
-            clientName: client.companyName,
-            quantity: quantity,
         });
-
-        await batch.commit();
 
       setAddDialogOpen(false);
       (event.target as HTMLFormElement).reset();
@@ -312,5 +313,3 @@ export default function CoconutPurchasesPage() {
     </div>
   );
 }
-
-    
