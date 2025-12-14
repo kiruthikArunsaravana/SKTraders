@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,7 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, Timestamp, doc, runTransaction } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, runTransaction, addDoc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -97,22 +97,11 @@ export default function CoconutPurchasesPage() {
     try {
         await runTransaction(firestore, async (transaction) => {
             const productRef = doc(firestore, 'products', 'coconut');
-            const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
-            const transactionRef = doc(collection(firestore, 'financial_transactions'));
-
-            // 1. Read the current product stock first.
             const productDoc = await transaction.get(productRef);
 
             let newQuantity;
             if (!productDoc.exists()) {
                 newQuantity = quantity;
-            } else {
-                const currentQuantity = productDoc.data().quantity || 0;
-                newQuantity = currentQuantity + quantity;
-            }
-            
-            // 2. Perform all write operations.
-            if (!productDoc.exists()) {
                  transaction.set(productRef, {
                     name: "Coconut",
                     quantity: newQuantity,
@@ -121,9 +110,12 @@ export default function CoconutPurchasesPage() {
                     modifiedDate: purchaseDate,
                 });
             } else {
+                const currentQuantity = productDoc.data().quantity || 0;
+                newQuantity = currentQuantity + quantity;
                 transaction.update(productRef, { quantity: newQuantity, modifiedDate: purchaseDate });
             }
 
+            const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
             const newPurchaseData: Omit<CoconutPurchase, 'id'> = {
                 clientId: client.id,
                 clientName: client.companyName,
@@ -134,6 +126,7 @@ export default function CoconutPurchasesPage() {
             };
             transaction.set(purchaseRef, newPurchaseData);
 
+            const transactionRef = doc(collection(firestore, 'financial_transactions'));
             transaction.set(transactionRef, {
                 type: 'expense',
                 amount: -totalAmount,
