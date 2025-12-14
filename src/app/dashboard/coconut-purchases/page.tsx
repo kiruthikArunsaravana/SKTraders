@@ -17,7 +17,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, Timestamp, doc, runTransaction, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, runTransaction } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -95,51 +95,48 @@ export default function CoconutPurchasesPage() {
     const totalAmount = quantity * price;
 
     try {
-        const batch = writeBatch(firestore);
+        await runTransaction(firestore, async (transaction) => {
+            const productRef = doc(firestore, 'products', 'coconut');
+            const productDoc = await transaction.get(productRef);
 
-        // 1. Create a reference for the new purchase document
-        const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
-        const newPurchaseData: Omit<CoconutPurchase, 'id'> = {
-            clientId: client.id,
-            clientName: client.companyName,
-            quantity,
-            price,
-            date: purchaseDate,
-            paymentStatus,
-        };
-        batch.set(purchaseRef, newPurchaseData);
+            let newQuantity;
+            if (!productDoc.exists()) {
+                newQuantity = quantity;
+                transaction.set(productRef, {
+                    name: "Coconut",
+                    quantity: newQuantity,
+                    costPrice: 10,
+                    sellingPrice: 15,
+                    modifiedDate: purchaseDate,
+                });
+            } else {
+                const currentQuantity = productDoc.data().quantity || 0;
+                newQuantity = currentQuantity + quantity;
+                transaction.update(productRef, { quantity: newQuantity, modifiedDate: purchaseDate });
+            }
 
-        // 2. Create a reference for the financial transaction
-        const transactionRef = doc(collection(firestore, 'financial_transactions'));
-        batch.set(transactionRef, {
-            type: 'expense',
-            amount: -totalAmount,
-            description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
-            category: 'Coconut',
-            date: purchaseDate,
-            clientName: client.companyName,
-            quantity: quantity,
-        });
+            const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
+            const newPurchaseData: Omit<CoconutPurchase, 'id'> = {
+                clientId: client.id,
+                clientName: client.companyName,
+                quantity,
+                price,
+                date: purchaseDate,
+                paymentStatus,
+            };
+            transaction.set(purchaseRef, newPurchaseData);
 
-        // 3. Update coconut stock
-        const productRef = doc(firestore, 'products', 'coconut');
-        const productDoc = await getDoc(productRef);
-
-        if (!productDoc.exists()) {
-             batch.set(productRef, { 
-              name: "Coconut", 
-              quantity: quantity, 
-              costPrice: 10, 
-              sellingPrice: 15, 
-              modifiedDate: purchaseDate 
+            const transactionRef = doc(collection(firestore, 'financial_transactions'));
+            transaction.set(transactionRef, {
+                type: 'expense',
+                amount: -totalAmount,
+                description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
+                category: 'Coconut',
+                date: purchaseDate,
+                clientName: client.companyName,
+                quantity: quantity,
             });
-        } else {
-            const currentQuantity = productDoc.data().quantity || 0;
-            batch.update(productRef, { quantity: currentQuantity + quantity, modifiedDate: purchaseDate });
-        }
-      
-      // Commit all writes at once
-      await batch.commit();
+        });
 
       setAddDialogOpen(false);
       (event.target as HTMLFormElement).reset();
