@@ -5,7 +5,6 @@ import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
-
 interface FirebaseClientProviderProps {
   children: ReactNode;
 }
