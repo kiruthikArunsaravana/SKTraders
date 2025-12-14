@@ -1,32 +1,29 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  if (getApps().length) {
-    return getSdks(getApp());
-  }
+// IMPORTANT: DO NOT MODIFY THIS FILE
+// This file is the single source of truth for initializing Firebase services.
 
-  // Always initialize with the config from environment variables.
-  // This works for Vercel and other non-Firebase hosting environments.
-  const app = initializeApp(firebaseConfig);
-  return getSdks(app);
+let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
+
+if (getApps().length > 0) {
+  firebaseApp = getApp();
+} else {
+  firebaseApp = initializeApp(firebaseConfig);
 }
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  return {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
-  };
-}
+auth = getAuth(firebaseApp);
+firestore = getFirestore(firebaseApp);
 
+export { firebaseApp, auth, firestore };
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
-export * from './non-blocking-login';
