@@ -1,64 +1,14 @@
-/**
- * @fileoverview Firestore Security Rules for SK Traders Application
- *
- * Core Philosophy:
- * This ruleset prioritizes rapid development by granting broad access to
- * authenticated users. It aims to prevent unauthorized data modification
- * and exposure while allowing for flexible data shapes during prototyping.
- *
- * Data Structure:
- * - /users/{userId}: Stores user profile data. Access is restricted to the
- *   owning user.
- * - All other collections: Public read/write for any authenticated user.
- *
- * Key Security Decisions:
- * - User listing is disabled to prevent data harvesting.
- * - Write access to most collections is allowed for any signed-in user to
- *   simplify development. This is a permissive rule for prototyping.
- * - Specific `allow get` is added to products to allow transactions to read
- *   stock levels before updating.
- * - Specific `allow write` is added to financial and purchase collections
- *   to ensure transactional integrity.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Enforces that only the authenticated user can access their own profile data.
-     */
+    // Users can only read and write their own documents.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    /**
-     * @description Allow transactions to read product stock levels. This is crucial for
-     * stock update operations that happen inside a transaction.
-     */
-    match /products/{productId} {
-      allow get: if request.auth != null;
-    }
-
-    /**
-     * @description Allows writes to financial transactions, necessary for recording expenses
-     * during a purchase.
-     */
-    match /financial_transactions/{transactionId} {
-      allow write: if request.auth != null;
-    }
-    
-    /**
-     * @description Allows writes to coconut purchases, necessary for recording the purchase
-     * during a transaction.
-     */
-    match /coconut_purchases/{purchaseId} {
-        allow write: if request.auth != null;
-    }
-
-    /**
-     * @description Allows any authenticated user to read from any other collection.
-     * Write access is handled by more specific rules or the general match below.
-     */
+    // Allow all authenticated users to read and write all other documents.
+    // This is a permissive rule for development.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }
