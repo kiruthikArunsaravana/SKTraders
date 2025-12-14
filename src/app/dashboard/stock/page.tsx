@@ -11,17 +11,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Gem, Wind, Box } from 'lucide-react';
+import { Gem, Wind, Box, Circle } from 'lucide-react';
 import type { Product, LocalSale } from '@/lib/types';
 import { initialProducts } from '@/lib/data';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, runTransaction } from 'firebase/firestore';
+import { collection, query, orderBy, doc, runTransaction, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
 const productIcons = {
     'coco-pith': Box,
     'coir-fiber': Wind,
     'husk-chips': Gem,
+    'coconut': Circle,
+    'copra': Circle
 };
 
 export default function StockPage() {
@@ -30,15 +33,11 @@ export default function StockPage() {
 
   const firestore = useFirestore();
 
-  // WORKAROUND: Querying a known-accessible collection to avoid permission errors on 'products'.
-  // The data from this query is not directly used but prevents the hook from erroring.
-  // The actual product data is merged from static definitions and Firestore quantities.
   const productsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'products'), orderBy('name', 'asc'));
   }, [firestore]);
 
-  // We are now going to use a different query to avoid the permission error, but the logic to populate remains the same.
   const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
 
@@ -50,6 +49,7 @@ export default function StockPage() {
         if (initialProductMap.has(dbProduct.id)) {
           const initialProduct = initialProductMap.get(dbProduct.id)!;
           initialProduct.quantity = dbProduct.quantity;
+          initialProduct.modifiedDate = dbProduct.modifiedDate;
         } else {
            initialProductMap.set(dbProduct.id, dbProduct);
         }
@@ -90,18 +90,19 @@ export default function StockPage() {
     try {
         await runTransaction(firestore, async (transaction) => {
             const productDoc = await transaction.get(productRef);
-            if (!productDoc.exists()) {
+            let currentQuantity = 0;
+            if (productDoc.exists()) {
+                currentQuantity = productDoc.data().quantity || 0;
+            } else {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { icon, ...dbProduct } = staticProductData;
                 transaction.set(productRef, {
                     ...dbProduct,
-                    quantity: quantity,
+                    quantity: 0,
                 });
-            } else {
-                const currentQuantity = productDoc.data().quantity || 0;
-                const newQuantity = currentQuantity + quantity;
-                transaction.update(productRef, { quantity: newQuantity });
             }
+            const newQuantity = currentQuantity + quantity;
+            transaction.update(productRef, { quantity: newQuantity, modifiedDate: Timestamp.now() });
         });
 
         setDialogOpen(false);
@@ -175,6 +176,7 @@ export default function StockPage() {
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead className="hidden md:table-cell">Available Quantity</TableHead>
+                <TableHead className="hidden md:table-cell">Last Modified</TableHead>
                 <TableHead className="hidden md:table-cell">Cost Price</TableHead>
                 <TableHead className="text-right">Selling Price</TableHead>
               </TableRow>
@@ -182,13 +184,14 @@ export default function StockPage() {
             <TableBody>
               {isLoading && (
                   <>
-                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                    <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
                   </>
               )}
               {!isLoading && productsWithIcons.map((product) => {
                 const Icon = product.icon || Box;
+                const maxQuantity = product.id === 'coconut' ? 50000 : 2000;
                 return (
                   <TableRow key={product.id}>
                     <TableCell>
@@ -200,8 +203,11 @@ export default function StockPage() {
                     <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-2">
                         <span>{product.quantity.toLocaleString()} units</span>
-                        <Progress value={(product.quantity / 2000) * 100} className="w-24 h-2" />
+                        <Progress value={(product.quantity / maxQuantity) * 100} className="w-24 h-2" />
                       </div>
+                    </TableCell>
+                     <TableCell className="hidden md:table-cell">
+                        {product.modifiedDate ? format(product.modifiedDate.toDate(), 'PP pp') : 'N/A'}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">${product.costPrice.toFixed(2)}</TableCell>
                     <TableCell className="text-right">${product.sellingPrice.toFixed(2)}</TableCell>
@@ -210,7 +216,7 @@ export default function StockPage() {
               })}
               {!isLoading && productsWithIcons.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">No products found.</TableCell>
+                  <TableCell colSpan={5} className="text-center">No products found.</TableCell>
                 </TableRow>
               )}
             </TableBody>

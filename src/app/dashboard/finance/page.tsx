@@ -39,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { FinancialTransaction } from '@/lib/types';
+import type { FinancialTransaction, Client } from '@/lib/types';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isWithinInterval } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -64,6 +64,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const expenseCategories = [
   { id: 'husk', name: 'Husk' },
+  { id: 'coconut', name: 'Coconut' },
   { id: 'maintenance', name: 'Maintenance' },
   { id: 'labour', name: 'Labour' },
   { id: 'other', name: 'Other' },
@@ -73,6 +74,7 @@ const incomeProducts = [
   { id: 'coco-pith', name: 'Coco Pith' },
   { id: 'coir-fiber', name: 'Coir Fiber' },
   { id: 'husk-chips', name: 'Husk Chips' },
+  { id: 'copra', name: 'Copra' },
   { id: 'other', name: 'Other' },
 ];
 
@@ -95,8 +97,14 @@ export default function FinancePage() {
     if (!firestore) return null;
     return query(collection(firestore, 'financial_transactions'), orderBy('date', 'desc'));
   }, [firestore]);
+  
+  const clientsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'clients'));
+  }, [firestore]);
 
   const { data: allTransactions, isLoading: isAllTransactionsLoading } = useCollection<FinancialTransaction>(transactionsQuery);
+  const { data: clients, isLoading: isClientsLoading } = useCollection<Client>(clientsQuery);
 
   const todaysTransactionsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -200,19 +208,29 @@ export default function FinancePage() {
     const description = formData.get('description') as string;
     const category = formData.get('category') as string;
     const date = entryDate || new Date();
+    const clientName = formData.get('clientName') as string | undefined;
+    const quantityStr = formData.get('quantity') as string | undefined;
+    const quantity = quantityStr ? parseFloat(quantityStr) : undefined;
 
     if (isNaN(amount) || !description || !category) {
       toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields.' });
       return;
     }
+    
+     if (type === 'expense' && (!clientName || !quantity)) {
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Client name and quantity are required for expenses.' });
+      return;
+    }
 
     const transactionsCollection = collection(firestore, 'financial_transactions');
-    const newTransaction = {
+    const newTransaction: FinancialTransaction = {
+      id: '', // Firestore will generate
       type,
       amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
       description,
       category,
       date: Timestamp.fromDate(date),
+      ...(type === 'expense' && { clientName, quantity }),
     };
 
     addDocumentNonBlocking(transactionsCollection, newTransaction);
@@ -322,7 +340,7 @@ export default function FinancePage() {
               <PlusCircle className="mr-2 h-5 w-5" /> Add Entry
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Add New Financial Entry</DialogTitle>
               <DialogDescription>Record a new income or expense transaction.</DialogDescription>
@@ -344,12 +362,11 @@ export default function FinancePage() {
                     <Label htmlFor="expense">Expense</Label>
                   </div>
                 </RadioGroup>
-                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
-                <Input id="description" name="description" placeholder="Description" required />
-                {entryType === 'expense' ? (
+                
+                 {entryType === 'expense' ? (
                   <Select name="category" required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder="Select an expense category" />
                     </SelectTrigger>
                     <SelectContent>
                       {expenseCategories.map(c => (
@@ -362,7 +379,7 @@ export default function FinancePage() {
                 ) : (
                   <Select name="category" required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
+                      <SelectValue placeholder="Select an income product" />
                     </SelectTrigger>
                     <SelectContent>
                       {incomeProducts.map(p => (
@@ -373,6 +390,31 @@ export default function FinancePage() {
                     </SelectContent>
                   </Select>
                 )}
+
+                {entryType === 'expense' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientName">Client Name</Label>
+                       <Select name="clientName" required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {isClientsLoading ? <SelectItem value="loading" disabled>Loading...</SelectItem> :
+                           clients?.map(c => <SelectItem key={c.id} value={c.companyName}>{c.companyName}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                     <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <Input id="quantity" name="quantity" type="number" placeholder="0" required />
+                    </div>
+                  </>
+                )}
+
+                <Input id="amount" name="amount" type="number" placeholder="Amount" required />
+                <Input id="description" name="description" placeholder="Description" required />
+                
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -480,21 +522,25 @@ export default function FinancePage() {
                   <TableRow>
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead className="hidden md:table-cell">Client</TableHead>
+                    <TableHead className="hidden md:table-cell">Quantity</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                   {isTodaysTransactionsLoading && <TableRow><TableCell colSpan={3}><Skeleton className="w-full h-8" /></TableCell></TableRow>}
+                   {isTodaysTransactionsLoading && <TableRow><TableCell colSpan={5}><Skeleton className="w-full h-8" /></TableCell></TableRow>}
                    {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'expense').map(t => (
                     <TableRow key={t.id}>
                         <TableCell>{t.description}</TableCell>
                         <TableCell>{t.category}</TableCell>
+                        <TableCell className="hidden md:table-cell">{t.clientName || 'N/A'}</TableCell>
+                        <TableCell className="hidden md:table-cell">{t.quantity?.toLocaleString() || 'N/A'}</TableCell>
                         <TableCell className="text-right">-${Math.abs(t.amount).toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
                   {!isTodaysTransactionsLoading && todaysTransactions?.filter(t => t.type === 'expense').length === 0 && (
                      <TableRow>
-                      <TableCell colSpan={3} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         No expenses recorded today.
                       </TableCell>
                     </TableRow>

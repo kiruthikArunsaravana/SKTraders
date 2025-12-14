@@ -44,7 +44,8 @@
         "name": { "type": "string" },
         "quantity": { "type": "number" },
         "costPrice": { "type": "number" },
-        "sellingPrice": { "type": "number" }
+        "sellingPrice": { "type": "number" },
+        "modifiedDate": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "quantity", "costPrice", "sellingPrice"]
     },
@@ -57,7 +58,9 @@
         "amount": { "type": "number" },
         "description": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
-        "category": { "type": "string" }
+        "category": { "type": "string" },
+        "clientName": { "type": "string" },
+        "quantity": { "type": "number" }
       },
       "required": ["type", "amount", "description", "date", "category"]
     },
@@ -96,6 +99,20 @@
         "invoiceNumber": { "type": "string" }
       },
       "required": ["clientId", "clientName", "productId", "quantity", "price", "date", "status", "paymentStatus", "invoiceNumber"]
+    },
+    "CoconutPurchase": {
+      "title": "Coconut Purchase",
+      "type": "object",
+      "description": "Represents a purchase of coconuts.",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Paid"] }
+      },
+      "required": ["clientId", "clientName", "quantity", "price", "date", "paymentStatus"]
     }
   },
   "auth": {
@@ -128,6 +145,10 @@
     "/local_sales/{saleId}": {
       "schema": { "$ref": "#/entities/LocalSale" },
       "description": "Stores local sale order details."
+    },
+    "/coconut_purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/CoconutPurchase" },
+      "description": "Stores coconut purchase records."
     }
   }
 }

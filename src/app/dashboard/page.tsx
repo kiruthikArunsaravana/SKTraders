@@ -37,7 +37,7 @@ import {
   format,
   isWithinInterval,
 } from 'date-fns';
-import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon } from 'lucide-react';
+import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon, Circle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { initialProducts } from '@/lib/data';
 
@@ -71,6 +71,11 @@ export default function DashboardPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'local_sales'), orderBy('date', 'desc'));
   }, [firestore]);
+  
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'products'), orderBy('name', 'asc'));
+  }, [firestore]);
 
   // Data fetching
   const { data: allTransactions, isLoading: isLoadingTransactions } =
@@ -82,9 +87,24 @@ export default function DashboardPage() {
   const { data: allLocalSales, isLoading: isLoadingLocalSales } =
     useCollection<LocalSale>(localSalesQuery);
 
-  // Using static products data to avoid permission issues
-  const products: Product[] = initialProducts;
-  const isLoadingProducts = false;
+  const { data: dbProducts, isLoading: isLoadingProducts } = useCollection<Product>(productsQuery);
+
+  const products = useMemo(() => {
+    const initialProductMap = new Map<string, Product>(initialProducts.map(p => [p.id, { ...p }]));
+    
+    if (dbProducts) {
+      dbProducts.forEach(dbProduct => {
+        if (initialProductMap.has(dbProduct.id)) {
+          const initialProduct = initialProductMap.get(dbProduct.id)!;
+          initialProduct.quantity = dbProduct.quantity;
+        } else {
+           initialProductMap.set(dbProduct.id, dbProduct);
+        }
+      });
+    }
+
+    return Array.from(initialProductMap.values());
+  }, [dbProducts]);
 
   const {
     totalRevenue,
@@ -304,12 +324,12 @@ export default function DashboardPage() {
         {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Top Product</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{topProduct.name}</div>
             <p className="text-xs text-muted-foreground">
-              {topProduct.units} units sold this month
+              {topProduct.units.toLocaleString()} units sold this month
             </p>
           </CardContent>
         </Card>}

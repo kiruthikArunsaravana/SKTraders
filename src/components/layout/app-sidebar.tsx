@@ -12,6 +12,7 @@ import {
   FileText,
   DollarSign,
   Truck,
+  Circle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '@/lib/types';
@@ -23,6 +24,7 @@ export default function AppSidebar() {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/clients', label: 'Clients', icon: Users },
     { href: '/dashboard/stock', label: 'Stock', icon: Boxes },
+    { href: '/dashboard/coconut-purchases', label: 'Coconut Buying', icon: Circle },
     { href: '/dashboard/exports', label: 'Exports', icon: Globe },
     { href: '/dashboard/local-sales', label: 'Local Sales', icon: Truck },
     { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },

@@ -193,8 +193,22 @@ export default function LocalSalesPage() {
           }
 
           const newQuantity = currentQuantity - selectedSale.quantity;
-          transaction.update(productRef, { quantity: newQuantity });
+          transaction.update(productRef, { quantity: newQuantity, modifiedDate: Timestamp.now() });
           transaction.update(saleRef, updatePayload);
+
+          if (selectedSale.productId === 'copra') {
+            const coconutRef = doc(firestore, 'products', 'coconut');
+            const coconutDoc = await transaction.get(coconutRef);
+            if (!coconutDoc.exists()) {
+              throw "Coconut stock not found!";
+            }
+            const coconutQuantity = coconutDoc.data().quantity || 0;
+            // Assuming 1 copra unit needs 1 coconut
+            if (coconutQuantity < selectedSale.quantity) {
+              throw "Insufficient coconut stock to produce copra for this sale.";
+            }
+            transaction.update(coconutRef, { quantity: coconutQuantity - selectedSale.quantity, modifiedDate: Timestamp.now() });
+          }
         });
         
         toast({

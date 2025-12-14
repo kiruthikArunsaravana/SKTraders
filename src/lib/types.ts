@@ -14,12 +14,13 @@ export type Client = {
 };
 
 export type Product = {
-  id: 'coco-pith' | 'coir-fiber' | 'husk-chips';
-  name: 'Coco Pith' | 'Coir Fiber' | 'Husk Chips';
+  id: 'coco-pith' | 'coir-fiber' | 'husk-chips' | 'coconut' | 'copra';
+  name: 'Coco Pith' | 'Coir Fiber' | 'Husk Chips' | 'Coconut' | 'Copra';
   quantity: number;
   costPrice: number;
   sellingPrice: number;
   icon?: LucideIcon; // Icon is UI-specific, making it optional
+  modifiedDate?: Timestamp;
 };
 
 export type FinancialTransaction = {
@@ -29,6 +30,8 @@ export type FinancialTransaction = {
   description: string;
   date: Timestamp;
   category: string;
+  clientName?: string;
+  quantity?: number;
 };
 
 export type PaymentStatus = 'Pending' | 'Paid';
@@ -69,4 +72,14 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   active?: boolean;
+}
+
+export type CoconutPurchase = {
+    id: string;
+    clientId: string;
+    clientName: string;
+    quantity: number;
+    price: number;
+    date: Timestamp;
+    paymentStatus: PaymentStatus;
 }

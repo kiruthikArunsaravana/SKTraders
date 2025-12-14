@@ -193,7 +193,7 @@ export default function ExportsPage() {
     
     const exportRef = doc(firestore, 'exports', selectedExport.id);
 
-    const updatePayload: { status: ExportStatus, paymentStatus: PaymentStatus } = { status: newStatus, paymentStatus: newPaymentStatus };
+    const updatePayload: { status: ExportStatus, paymentStatus: PaymentStatus, modifiedDate?: Timestamp } = { status: newStatus, paymentStatus: newPaymentStatus };
 
     if (newStatus === 'Completed' && selectedExport.status !== 'Completed') {
       const productRef = doc(firestore, 'products', selectedExport.productId);
@@ -211,7 +211,7 @@ export default function ExportsPage() {
           }
 
           const newQuantity = currentQuantity - selectedExport.quantity;
-          transaction.update(productRef, { quantity: newQuantity });
+          transaction.update(productRef, { quantity: newQuantity, modifiedDate: Timestamp.now() });
           transaction.update(exportRef, updatePayload);
         });
         
