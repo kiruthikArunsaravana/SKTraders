@@ -1,3 +1,4 @@
+
 'use client';
 
 // This is the correct, hardcoded Firebase configuration for your project.
@@ -8,4 +9,5 @@ export const firebaseConfig = {
   apiKey: 'AIzaSyD2Ww8RFwIXHCyxAKP0TFNna10YeLMCChQ',
   authDomain: 'husktrack2-37640420.firebaseapp.com',
   messagingSenderId: '1077942344581',
+  storageBucket: 'husktrack2-37640420.appspot.com'
 };
