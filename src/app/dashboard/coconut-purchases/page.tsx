@@ -18,7 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, Timestamp, doc, addDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -96,40 +96,29 @@ export default function CoconutPurchasesPage() {
     const totalAmount = quantity * price;
 
     try {
-      await runTransaction(firestore, async (transaction) => {
         const productRef = doc(firestore, 'products', 'coconut');
-        const productDoc = await transaction.get(productRef);
+        const productDoc = await getDoc(productRef);
         
         let newQuantity;
         if (!productDoc.exists()) {
           newQuantity = quantity;
-          transaction.set(productRef, {
-            id: 'coconut',
-            name: "Coconut",
-            quantity: newQuantity,
-            costPrice: 10,
-            sellingPrice: 15,
-            modifiedDate: purchaseDate,
-          });
         } else {
           const currentQuantity = productDoc.data().quantity || 0;
           newQuantity = currentQuantity + quantity;
-          transaction.update(productRef, { quantity: newQuantity, modifiedDate: purchaseDate });
         }
 
-        const newPurchaseData = {
+        // Add purchase record
+        await addDoc(collection(firestore, 'coconut_purchases'), {
             clientId: client.id,
             clientName: client.companyName,
             quantity,
             price,
             date: purchaseDate,
             paymentStatus,
-        };
-        const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
-        transaction.set(purchaseRef, newPurchaseData);
+        });
 
-        const transactionRef = doc(collection(firestore, 'financial_transactions'));
-        transaction.set(transactionRef, {
+        // Add financial transaction record
+        await addDoc(collection(firestore, 'financial_transactions'), {
             type: 'expense',
             amount: -totalAmount,
             description: `Purchase of ${quantity} coconuts from ${client.companyName}`,
@@ -138,7 +127,9 @@ export default function CoconutPurchasesPage() {
             clientName: client.companyName,
             quantity: quantity,
         });
-      });
+      
+        // Update product stock
+        await updateDoc(productRef, { quantity: newQuantity, modifiedDate: purchaseDate, name: "Coconut", costPrice: 10, sellingPrice: 15 });
       
       setAddDialogOpen(false);
       (event.target as HTMLFormElement).reset();
@@ -307,5 +298,4 @@ export default function CoconutPurchasesPage() {
       </Card>
     </div>
   );
-
-    
+  
