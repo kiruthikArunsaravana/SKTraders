@@ -106,6 +106,11 @@ export default function CoconutPurchasesPage() {
 
     try {
        await runTransaction(firestore, async (transaction) => {
+        // --- READS FIRST ---
+        const productRef = doc(firestore, 'products', 'coconut');
+        const productDoc = await transaction.get(productRef);
+
+        // --- WRITES SECOND ---
         // 1. Add purchase document
         const purchaseRef = doc(collection(firestore, 'coconut_purchases'));
         transaction.set(purchaseRef, newPurchaseData);
@@ -122,10 +127,7 @@ export default function CoconutPurchasesPage() {
             quantity: quantity,
         });
 
-        // 3. Update coconut stock
-        const productRef = doc(firestore, 'products', 'coconut');
-        const productDoc = await transaction.get(productRef);
-        
+        // 3. Update coconut stock based on the earlier read
         if (!productDoc.exists()) {
             transaction.set(productRef, { 
               name: "Coconut", 
