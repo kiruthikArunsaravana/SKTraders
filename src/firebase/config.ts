@@ -1,8 +1,8 @@
 export const firebaseConfig = {
-  "projectId": "tracker-with-coconut-488-edd4f",
-  "appId": "1:933855061938:web:99bda7e381824ce8ee66ab",
-  "apiKey": "AIzaSyASQoE3m-ebhuV1p1XPOn6zJP-Zi0AcXiE",
-  "authDomain": "tracker-with-coconut-488-edd4f.firebaseapp.com",
-  "measurementId": "",
+  "projectId": "husktrack2-42960620",
+  "appId": "1:933855061938:web:786c5268c34c442dce6739",
+  "apiKey": "AIzaSyC2qAz6bqd6XvjBf9U-1n1gCq5r7mI1fFQ",
+  "authDomain": "husktrack2-42960620.firebaseapp.com",
+  "measurementId": "G-DR29Y34Y15",
   "messagingSenderId": "933855061938"
 };
