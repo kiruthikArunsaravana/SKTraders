@@ -37,7 +37,7 @@ import {
   format,
   isWithinInterval,
 } from 'date-fns';
-import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon, Circle } from 'lucide-react';
+import { DollarSign, Package, TrendingUp, ArrowDownRight, ArrowUpRight, User as UserIcon, Circle, Wallet } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { initialProducts } from '@/lib/data';
 
@@ -111,6 +111,8 @@ export default function DashboardPage() {
     revenueChange,
     totalExpenses,
     expenseChange,
+    netProfit,
+    netProfitChange,
     exportValue,
     localSaleValue,
     topProduct,
@@ -124,6 +126,8 @@ export default function DashboardPage() {
         revenueChange: 0,
         totalExpenses: 0,
         expenseChange: 0,
+        netProfit: 0,
+        netProfitChange: 0,
         exportValue: 0,
         localSaleValue: 0,
         topProduct: { name: 'N/A', units: 0 },
@@ -221,10 +225,15 @@ export default function DashboardPage() {
     const currentMonthRevenue = currentMonthExportRevenue + currentMonthLocalSaleRevenue + currentMonthOtherIncome;
     const prevMonthRevenue = prevMonthExportRevenue + prevMonthLocalSaleRevenue + prevMonthOtherIncome;
     
+    // Net Profit
+    const currentMonthNetProfit = currentMonthRevenue - currentMonthExpenses;
+    const prevMonthNetProfit = prevMonthRevenue - prevMonthExpenses;
+
     // Calculate percentage changes
     const revenueChange = prevMonthRevenue > 0 ? ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100 : currentMonthRevenue > 0 ? 100 : 0;
     const expenseChange = prevMonthExpenses > 0 ? ((currentMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100 : currentMonthExpenses > 0 ? 100 : 0;
-
+    const netProfitChange = prevMonthNetProfit !== 0 ? ((currentMonthNetProfit - prevMonthNetProfit) / Math.abs(prevMonthNetProfit)) * 100 : currentMonthNetProfit > 0 ? 100 : 0;
+    
     // Determine top clients
     const topInternational = [...clientExportValues.values()].sort((a,b) => b.value - a.value)[0];
     const topLocal = [...clientLocalSaleValues.values()].sort((a,b) => b.value - a.value)[0];
@@ -275,6 +284,8 @@ export default function DashboardPage() {
       revenueChange,
       totalExpenses: currentMonthExpenses,
       expenseChange,
+      netProfit: currentMonthNetProfit,
+      netProfitChange,
       exportValue: currentMonthExportValue,
       localSaleValue: currentMonthLocalSaleValue,
       topProduct,
@@ -317,6 +328,20 @@ export default function DashboardPage() {
              <p className="text-xs text-muted-foreground flex items-center">
               {expenseChange >= 0 ? <ArrowUpRight className="h-4 w-4 text-red-500" /> : <ArrowDownRight className="h-4 w-4 text-green-500" />}
               {expenseChange.toFixed(1)}% from last month
+            </p>
+          </CardContent>
+        </Card>}
+
+        {isLoading ? <Skeleton className="h-32" /> : <Card className="xl:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${netProfit.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground flex items-center">
+              {netProfitChange >= 0 ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
+              {netProfitChange.toFixed(1)}% from last month
             </p>
           </CardContent>
         </Card>}
