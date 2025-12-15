@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   Users,
@@ -57,8 +58,8 @@ export default function AppSidebar() {
     <div className="hidden border-r bg-card md:block">
       <div className="flex h-full max-h-screen flex-col gap-2">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-headline text-lg font-semibold">
-            <span>SKTraders</span>
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+             <Image src="/logo.png" alt="SK Traders Logo" width={120} height={40} />
           </Link>
         </div>
         <div className="flex-1">
