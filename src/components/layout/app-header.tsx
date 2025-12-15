@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import AppSidebar from './app-sidebar';
 import Image from 'next/image';
-import { placeholderImages } from '@/lib/placeholder-images.json';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import React from 'react';
@@ -47,8 +46,6 @@ export default function AppHeader() {
       signOut(auth);
     }
   };
-
-  const avatar = placeholderImages.find((p) => p.id === 'avatar-1');
 
   const getBreadcrumbs = () => {
     const segments = pathname.split('/').filter(Boolean);
@@ -97,16 +94,13 @@ export default function AppHeader() {
             size="icon"
             className="overflow-hidden rounded-full"
           >
-            {avatar && (
-              <Image
-                src={avatar.imageUrl}
-                width={36}
-                height={36}
-                alt="Avatar"
-                className="overflow-hidden rounded-full"
-                data-ai-hint={avatar.imageHint}
-              />
-            )}
+            <Image
+              src="/logo.png"
+              width={36}
+              height={36}
+              alt="SK Traders Logo"
+              className="overflow-hidden rounded-full"
+            />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
