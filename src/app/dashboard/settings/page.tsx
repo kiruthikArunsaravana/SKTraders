@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const [isPasswordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [isConfirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
-  const collectionsToClear = ['clients', 'exports', 'local_sales', 'financial_transactions'];
+  const collectionsToClear = ['clients', 'exports', 'local_sales', 'financial_transactions', 'coconut_purchases'];
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
