@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      String   @default("Employee")
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id               String   @id @default(uuid())
+  companyName      String
+  contactName      String?
+  contactEmail     String?   @map("contactEmail")
+  phone            String?
+  country          String?
+  clientType       String?   // local / international
+  totalSales       Float     @default(0)
+  lastPurchaseDate DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  name         String
+  sku          String?
+  price        Float
+  costPrice    Float?   @default(0)
+  sellingPrice Float?   @default(0)
+  quantity     Int      @default(0)
+  modifiedDate DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model FinancialTransaction {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String   // income / expense
+  date        DateTime @default(now())
+  description String?
+  category    String?
+  clientName  String?
+  quantity    Int?
+  createdAt   DateTime @default(now())
+}
+
+model Export {
+  id                 String   @id @default(uuid())
+  clientId           String
+  productId          String
+  destinationCountry String?
+  destinationPort    String?
+  quantity           Int
+  price              Float    @default(0)
+  status             String   @default("To-do")
+  paymentStatus      String   @default("Pending")
+  invoiceNumber      String?
+  date               DateTime @default(now())
+  createdAt          DateTime @default(now())
+}
+
+model LocalSale {
+  id            String   @id @default(uuid())
+  clientId      String?
+  productId     String
+  quantity      Int
+  price         Float
+  status        String   @default("To-do")
+  paymentStatus String   @default("Pending")
+  invoiceNumber String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+model CoconutPurchase {
+  id            String   @id @default(uuid())
+  clientId      String?
+  supplier      String?
+  quantity      Int
+  price         Float
+  paymentStatus String   @default("Pending")
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+model CoconutWorkerEntry {
+  id                String   @id @default(uuid())
+  weekStart         DateTime
+  processedCoconuts Int
+  totalWorkerCost   Float
+  paidToWorker      Float
+  createdAt         DateTime @default(now())
+}

@@ -1,0 +1,326 @@
+'use client';
+
+import { PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { useState, useMemo } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { format, isWithinInterval } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import type { CoconutPurchase, Client, PaymentStatus } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, doc, updateDoc } from '@/firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const paymentStatuses: PaymentStatus[] = ['Pending', 'Paid'];
+
+export default function CoconutPurchasesPage() {
+  const { toast } = useToast();
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | 'all'>('all');
+
+  const firestore = useFirestore();
+  const notifyChanged = (...collectionNames: string[]) => {
+    if (typeof window === 'undefined') return;
+    for (const collectionName of collectionNames) {
+      window.dispatchEvent(new CustomEvent('firestore-shim:changed', { detail: { collectionName } }));
+    }
+  };
+
+  const purchasesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'coconut_purchases'), orderBy('date', 'desc'));
+  }, [firestore]);
+
+  const clientsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'clients'));
+  }, [firestore]);
+
+  const { data: purchases, isLoading: isLoadingPurchases } = useCollection<CoconutPurchase>(purchasesQuery);
+  const { data: clients, isLoading: isLoadingClients } = useCollection<Client>(clientsQuery);
+
+  const filteredPurchases = useMemo(() => {
+    if (!purchases) return [];
+    
+    return purchases.filter(p => {
+      const isInDateRange = (() => {
+        if (!dateRange?.from) return true;
+        const from = dateRange.from;
+        const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
+        to.setHours(23, 59, 59, 999);
+        const purchaseDate = p.date.toDate();
+        return isWithinInterval(purchaseDate, { start: from, end: to });
+      })();
+
+      const hasPaymentStatus = paymentStatusFilter === 'all' || p.paymentStatus === paymentStatusFilter;
+      
+      return isInDateRange && hasPaymentStatus;
+    });
+  }, [purchases, dateRange, paymentStatusFilter]);
+
+  async function handleAddPurchase(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const clientId = formData.get('clientId') as string;
+    const quantity = parseFloat(formData.get('quantity') as string);
+    const price = parseFloat(formData.get('price') as string);
+    const initialPaymentStatus = formData.get('paymentStatus') as PaymentStatus;
+
+    if (!clientId || !quantity || !price || !initialPaymentStatus) {
+       toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill out all fields correctly.' });
+       return;
+    }
+    
+    const client = clients?.find(c => c.id === clientId);
+    if (!client) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selected client not found.' });
+      return;
+    }
+
+    try {
+      // Call backend endpoint that performs the same transaction (create purchase, update product stock, create financial txn if paid)
+      const res = await fetch('/api/coconut-purchases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: client.id, quantity, price, paymentStatus: initialPaymentStatus }) });
+      if (!res.ok) throw new Error('Failed to add purchase');
+      notifyChanged('coconut_purchases', 'products', 'financial_transactions');
+
+      setAddDialogOpen(false);
+      (event.target as HTMLFormElement).reset();
+      toast({
+        title: "Coconut Purchase Added",
+        description: `Purchase from ${client.companyName} recorded, and stock updated.`,
+      });
+
+    } catch (error: any) {
+        console.error("Failed to add coconut purchase:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Operation Failed',
+            description: error.message || 'Could not save the purchase and update stock. Please try again.'
+        });
+    }
+  }
+
+  const handleStatusChange = async (purchase: CoconutPurchase, newPaymentStatus: PaymentStatus) => {
+    if (!firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update status.' });
+      return;
+    }
+
+    if (newPaymentStatus === purchase.paymentStatus) {
+      return; // No change
+    }
+
+    const purchaseRef = doc(firestore, 'coconut_purchases', purchase.id);
+
+    try {
+      await updateDoc(purchaseRef, { paymentStatus: newPaymentStatus, clientId: purchase.clientId });
+      notifyChanged('coconut_purchases', 'financial_transactions');
+
+      if (newPaymentStatus === 'Paid') {
+        toast({
+          title: "Payment Status Updated",
+          description: `Purchase marked as paid and an expense has been recorded.`,
+        });
+      } else {
+        toast({
+          title: "Payment Status Updated",
+          description: `Purchase status has been updated to ${newPaymentStatus}.`,
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to update payment status:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: error.message || 'Could not update the payment status. Please try again.'
+      });
+    }
+  };
+  
+  const statusBadgeVariant = (status: PaymentStatus) => {
+    switch (status) {
+        case 'Paid': return 'default';
+        case 'Pending': return 'destructive';
+        default: return 'outline';
+    }
+  }
+  
+  const isLoading = isLoadingPurchases || isLoadingClients;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <h1 className="text-3xl font-headline">Coconut Purchases</h1>
+        <div className="flex gap-2 flex-wrap justify-end">
+           <Popover>
+              <PopoverTrigger asChild>
+                <Button variant={'outline'} className={cn('w-full sm:w-[280px] justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, 'LLL dd, y')} - {format(dateRange.to, 'LLL dd, y')}</> : format(dateRange.from, 'LLL dd, y')) : <span>Filter by date...</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar initialFocus mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+              </PopoverContent>
+            </Popover>
+            <Select value={paymentStatusFilter} onValueChange={(value) => setPaymentStatusFilter(value as PaymentStatus | 'all')}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by payment..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                {paymentStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        </div>
+      </div>
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Purchase Records</CardTitle>
+            <CardDescription>
+              Track all your coconut purchases. Showing {filteredPurchases.length} record(s).
+            </CardDescription>
+          </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add Purchase
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add New Coconut Purchase</DialogTitle>
+                <DialogDescription>
+                  Enter the details of the new purchase. Stock will be increased. If status is 'Paid', an expense is also created.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddPurchase}>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                      <Label htmlFor="clientId">Client</Label>
+                      <Select name="clientId" required>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Select a client" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {isLoadingClients ? <SelectItem value="loading" disabled>Loading clients...</SelectItem> :
+                              clients?.map(client => (
+                                  <SelectItem key={client.id} value={client.id}>{client.companyName}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity (pieces)</Label>
+                    <Input id="quantity" name="quantity" type="number" placeholder="e.g., 10000" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price Per Piece</Label>
+                    <Input id="price" name="price" type="number" step="0.01" placeholder="e.g., 12.50" required />
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="paymentStatus">Payment Status</Label>
+                      <Select name="paymentStatus" defaultValue="Pending" required>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Select payment status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {paymentStatuses.map(status => (
+                                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit">Add Purchase</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Client</TableHead>
+                <TableHead className="hidden sm:table-cell">Quantity</TableHead>
+                <TableHead className="hidden md:table-cell">Date</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && (
+                  <>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                  </>
+              )}
+              {!isLoading && filteredPurchases.length > 0 ? (
+                filteredPurchases.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <div className="font-medium">{p.clientName}</div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">{p.quantity.toLocaleString()} pcs</TableCell>
+                    <TableCell className="hidden md:table-cell">{format(p.date.toDate(), 'PP')}</TableCell>
+                    <TableCell>
+                      {p.paymentStatus === 'Paid' ? (
+                          <Badge variant={statusBadgeVariant(p.paymentStatus)}>{p.paymentStatus}</Badge>
+                      ) : (
+                        <Select defaultValue={p.paymentStatus} onValueChange={(value: PaymentStatus) => handleStatusChange(p, value)}>
+                            <SelectTrigger className="w-[110px] h-8">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {paymentStatuses.map(status => (
+                                    <SelectItem key={status} value={status}>
+                                        <Badge variant={statusBadgeVariant(status)} className="w-full text-center">
+                                            {status}
+                                        </Badge>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">${(p.quantity * p.price).toLocaleString()}</TableCell>
+                  </TableRow>
+                ))
+              ) : !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    No purchases match your filters.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+    
+
+    

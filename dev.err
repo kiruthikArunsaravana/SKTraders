@@ -1,0 +1,145 @@
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async POST (src\app\api\auth\login\route.ts:6:30)
+  4 |
+  5 | export async function POST(req: Request) {
+> 6 |   const { email, password } = await req.json();
+    |                              ^
+  7 |   if (!email || !password) return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  8 |
+  9 |   const user = await prisma.user.findUnique({ where: { email } });
+ ⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].product.create()` invocation in
+C:\Users\sanga\Downloads\SKTraders-main (1)\SKTraders-main\.next\server\chunks\[root-of-the-server]__31546ac3._.js:101:164
+
+   98 }
+   99 async function POST(req) {
+  100     const body = await req.json();
+→ 101     const created = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].product.create(
+Unique constraint failed on the constraint: `PRIMARY`
+    at <unknown> (src\app\api\products\route.ts:11:39)
+    at async POST (src\app\api\products\route.ts:11:18)
+   9 | export async function POST(req: Request) {
+  10 |   const body = await req.json();
+> 11 |   const created = await prisma.product.create({ data: body });
+     |                                       ^
+  12 |   return NextResponse.json(created);
+  13 | }
+  14 | {
+  code: 'P2002',
+  clientVersion: '5.22.0',
+  meta: [Object]
+}
+ ⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].product.create()` invocation in
+C:\Users\sanga\Downloads\SKTraders-main (1)\SKTraders-main\.next\server\chunks\[root-of-the-server]__31546ac3._.js:101:164
+
+   98 }
+   99 async function POST(req) {
+  100     const body = await req.json();
+→ 101     const created = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["prisma"].product.create(
+Unique constraint failed on the constraint: `PRIMARY`
+    at <unknown> (src\app\api\products\route.ts:11:39)
+    at async POST (src\app\api\products\route.ts:11:18)
+   9 | export async function POST(req: Request) {
+  10 |   const body = await req.json();
+> 11 |   const created = await prisma.product.create({ data: body });
+     |                                       ^
+  12 |   return NextResponse.json(created);
+  13 | }
+  14 | {
+  code: 'P2002',
+  clientVersion: '5.22.0',
+  meta: [Object]
+}
+^C^C

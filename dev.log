@@ -1,0 +1,47 @@
+
+> nextn@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.3.8 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.56.1:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1917ms
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 1322ms
+ POST /api/auth/login 500 in 2348ms
+ POST /api/auth/login 500 in 316ms
+ POST /api/auth/login 500 in 264ms
+ POST /api/auth/login 500 in 264ms
+ POST /api/auth/login 500 in 364ms
+ POST /api/auth/login 401 in 207ms
+ ○ Compiling /api/auth/register ...
+ ✓ Compiled /api/auth/register in 552ms
+ POST /api/auth/register 200 in 805ms
+ POST /api/auth/login 200 in 238ms
+ ✓ Compiled /api/clients in 473ms
+ POST /api/clients 200 in 549ms
+ ○ Compiling /api/coconut-purchases ...
+ ✓ Compiled /api/coconut-purchases in 521ms
+ POST /api/coconut-purchases 200 in 657ms
+ ✓ Compiled /api/local-sales in 456ms
+ POST /api/local-sales 500 in 558ms
+ ○ Compiling /api/products ...
+ ✓ Compiled /api/products in 1229ms
+ POST /api/products 500 in 1854ms
+ PATCH /api/products 200 in 186ms
+ POST /api/local-sales 200 in 203ms
+ ○ Compiling /api/exports ...
+ ✓ Compiled /api/exports in 1238ms
+ POST /api/exports 200 in 1428ms
+ ○ Compiling /api/financial-transactions ...
+ ✓ Compiled /api/financial-transactions in 1171ms
+ POST /api/financial-transactions 200 in 1413ms
+ GET /api/clients 200 in 148ms
+ GET /api/products 200 in 171ms
+ GET /api/coconut-purchases 200 in 174ms
+ GET /api/local-sales 200 in 152ms
+ GET /api/exports 200 in 155ms
+ GET /api/financial-transactions 200 in 182ms
